@@ -1,3 +1,5 @@
+import enum
+
 from .error import ParseError
 from .schema import *
 

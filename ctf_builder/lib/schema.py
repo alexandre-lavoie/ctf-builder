@@ -1,6 +1,5 @@
 import abc
 import dataclasses
-import enum
 import os
 import typing
 

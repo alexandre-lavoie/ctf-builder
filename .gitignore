@@ -1,2 +1,6 @@
 __pycache__
-doc
+
+/*.egg-info
+/.venv
+/build
+/doc
