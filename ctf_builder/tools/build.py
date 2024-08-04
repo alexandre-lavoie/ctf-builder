@@ -44,6 +44,11 @@ def build_challenge(json_path: str, skip_active: bool) -> typing.Sequence[typing
     return errors
 
 def build_challenges(root: str) -> typing.Mapping[str, typing.Sequence[LibError]]:
+    if not os.path.isdir(root):
+        return {
+            "": [BuildError("challenges directory not found")]
+        }
+
     out = {}
     for file in glob.glob("**/challenge.json", root_dir=root, recursive=True):
         path = os.path.join(root, file)

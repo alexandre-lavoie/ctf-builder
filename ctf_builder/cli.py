@@ -27,13 +27,12 @@ class Command:
 
 @dataclasses.dataclass
 class Menu:
-    commands: typing.Mapping[str, Command] = dataclasses.field(default_factory=dict)
-    menus: typing.Mapping[str, "Menu"] = dataclasses.field(default_factory=dict)
+    options: typing.Mapping[str, typing.Union[Command, "Menu"]] = dataclasses.field(default_factory=dict)
     help: typing.Optional[str] = dataclasses.field(default=None)
 
 CLI = Menu(
     help="Main menu",
-    commands={
+    options={
         "build": Command(
             help="Build challenge static files",
             args=build_args,
@@ -43,26 +42,29 @@ CLI = Menu(
             help="Build schemas for internal types",
             args=schema_args,
             cli=schema_cli
-        )
-    },
-    menus={
+        ),
         "ctfd": Menu(
             help="Tools for CTFd",
-            commands={
-                "challenges": Command(
-                    help="Deploy challenges to CTFd",
-                    args=ctfd_challenges_args,
-                    cli=ctfd_challenges_cli
-                ),
-                "setup": Command(
+            options={
+                "init": Command(
                     help="Setup CTFd",
                     args=ctfd_setup_args,
                     cli=ctfd_setup_cli
                 ),
-                "teams": Command(
-                    help="Deploy teams to CTFd",
-                    args=ctfd_teams_args,
-                    cli=ctfd_teams_cli
+                "deploy": Menu(
+                    help="Deploy to CTFd",
+                    options={
+                        "challenges": Command(
+                            help="Deploy challenges to CTFd",
+                            args=ctfd_challenges_args,
+                            cli=ctfd_challenges_cli
+                        ),
+                        "teams": Command(
+                            help="Deploy teams to CTFd",
+                            args=ctfd_teams_args,
+                            cli=ctfd_teams_cli
+                        )
+                    }
                 )
             }
         )
@@ -76,22 +78,20 @@ def build_command(subparser: argparse._SubParsersAction, name: str, command: Com
 def build_menu(parser: argparse.ArgumentParser, menu: Menu, root_directory: str, depth: int=0):
     subparser = parser.add_subparsers(dest=f"_{depth}", required=True)
 
-    for command_name, command in menu.commands.items():
-        build_command(subparser, command_name, command, root_directory)
-
-    for menu_name, menu in menu.menus.items():
-        build_menu(subparser.add_parser(name=menu_name, help=menu.help), menu, root_directory, depth + 1)
+    for option_name, option in menu.options.items():
+        if isinstance(option, Command):
+            build_command(subparser, option_name, option, root_directory)
+        elif isinstance(option, Menu):
+            build_menu(subparser.add_parser(name=option_name, help=option.help), option, root_directory, depth + 1)
 
 def run_menu(args, menu: Menu, root_directory: str, depth: int=0) -> bool:
     target = getattr(args, f"_{depth}")
 
-    command = menu.commands.get(target)
-    if command:
-        return command.cli(args, root_directory)
-
-    sub_menu = menu.menus.get(target)
-    if sub_menu:
-        return run_menu(args, sub_menu, root_directory, depth + 1)
+    option = menu.options.get(target)
+    if isinstance(option, Command):
+        return option.cli(args, root_directory)
+    elif isinstance(option, Menu):
+        return run_menu(args, option, root_directory, depth + 1)
 
     return False
 

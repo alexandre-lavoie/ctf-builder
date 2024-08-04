@@ -2,10 +2,13 @@ import abc
 import dataclasses
 import glob
 import io
+import json
 import os.path
-import subprocess
 import typing
 import zipfile
+
+import docker
+import docker.errors
 
 from .error import BuildError
 from .schema import *
@@ -118,6 +121,8 @@ class BuildBuilderDocker(BuildBuilder):
 
     @classmethod
     def build(cls, context: BuildContext, builder: BuilderDocker) -> typing.Sequence[BuildError]:
+        client = docker.APIClient()
+
         if builder.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
@@ -129,7 +134,7 @@ class BuildBuilderDocker(BuildBuilder):
         tag = cls.to_docker_tag(context.name)
 
         errors = []
-        build_args = []
+        build_args = {}
         for args in builder.args:
             ba = BuildArgs.get(args)
             if ba is None:
@@ -142,17 +147,29 @@ class BuildBuilderDocker(BuildBuilder):
                 break 
 
             for key, value in arg_map.items():
-                build_args.append(f"--build-arg={key}={value}")
+                build_args[key] = value
 
         cwd = os.path.abspath(context.path)
 
-        proc = subprocess.run(["docker", "build", *build_args, "-t", tag, "-f", os.path.abspath(dockerfile), "."], cwd=cwd)
-        if proc.returncode != 0:
+        is_ok = False
+        for res in client.build(
+            path=cwd,
+            dockerfile=os.path.abspath(dockerfile),
+            tag=tag,
+            buildargs=build_args
+        ):
+            data = json.loads(res.decode())
+
+            if "aux" in data:
+                is_ok = True
+
+        if not is_ok:
             return errors + [BuildError("Dockerfile not built")]
 
-        proc = subprocess.run(["docker", "create", "--name", tag, tag], cwd=cwd)
-        if proc.returncode != 0:
-            return errors + [BuildError("Dockerfile not created")]
+        container = client.create_container(image=tag)
+        if container is None or "Id" not in container:
+            return False
+        container_id: str = container["Id"] 
 
         for i, file_map in enumerate(builder.files):
             source, destination = BuildFileMap.build(file_map)
@@ -164,15 +181,17 @@ class BuildBuilderDocker(BuildBuilder):
 
             os.makedirs(os.path.dirname(destination), exist_ok=True)
 
-            proc = subprocess.run(["docker", "cp", f"{tag}:{source}", destination], cwd=cwd)
-            if proc.returncode != 0:
-                errors.append(BuildError(f"file {i} not copied"))
+            try:
+                res, _ = client.get_archive(container_id, source)
+            except docker.errors.NotFound:
+                errors.append(BuildError(f"file {source} not found in container"))
+                continue
 
-        proc = subprocess.run(["docker", "rm", "-f", tag], cwd=cwd)
-        if proc.returncode != 0:
-            errors.append(
-                BuildError("Dockerfile not removed")
-            )
+            with open(destination, "wb") as h:
+                for chunk in res:
+                    h.write(chunk)
+
+        client.remove_container(container_id)
 
         return errors
 
