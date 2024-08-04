@@ -1,0 +1,120 @@
+{
+  "$schema": "../../../doc/schema.json",
+  "name": "Sample",
+  "active": true,
+  "challenges": [
+    {
+      "category": "reverse",
+      "value": 1,
+      "descriptions": [
+        {
+          "$type": "english",
+          "path": "text/0/CHAL-EN.md"
+        },
+        {
+          "$type": "french",
+          "path": "text/0/CHAL-FR.md"
+        }
+      ],
+      "flags": [
+        {
+          "case_sensitive": true,
+          "regex": false,
+          "values": {
+            "$type": "env",
+            "path": "FLAG",
+            "keys": ["FLAG1"]
+          }
+        }
+      ],
+      "attachments": [
+        {
+          "$type": "directory",
+          "path": "challenge/0",
+          "name": "source.zip"
+        },
+        {
+          "$type": "file",
+          "path": "build/0/sample",
+          "name": "challenge"
+        }
+      ],
+      "hints": [
+        {
+          "cost": 1,
+          "texts": [
+            {
+              "$type": "english",
+              "path": "text/0/HINT-EN.md"
+            },
+            {
+              "$type": "french",
+              "path": "text/0/HINT-FR.md"
+            }
+          ]
+        }
+      ],
+      "next": 1
+    },
+    {
+      "name": "2",
+      "category": "reverse",
+      "value": 2,
+      "descriptions": [
+        {
+          "$type": "english",
+          "path": "text/1/CHAL-EN.md"
+        },
+        {
+          "$type": "french",
+          "path": "text/1/CHAL-FR.md"
+        }
+      ],
+      "flags": [
+        {
+          "case_sensitive": true,
+          "regex": false,
+          "values": {
+            "$type": "list",
+            "list": ["flag-2"]
+          }
+        },
+        {
+          "case_sensitive": true,
+          "regex": true,
+          "values": {
+            "$type": "list",
+            "list": ["^flag-2$"]
+          }
+        }
+      ],
+      "attachments": [
+        {
+          "$type": "directory",
+          "path": "challenge/1",
+          "name": "source.zip"
+        }
+      ],
+      "prerequisites": [0]
+    }
+  ],
+  "build": [
+    {
+      "$type": "docker",
+      "path": "Dockerfile.build",
+      "files": [
+        {
+          "source": "/build/sample",
+          "destination": "build/0/sample"
+        }
+      ],
+      "args": [
+        {
+          "$type": "env",
+          "path": "FLAG",
+          "keys": ["FLAG1"]
+        }
+      ]
+    }
+  ]
+}

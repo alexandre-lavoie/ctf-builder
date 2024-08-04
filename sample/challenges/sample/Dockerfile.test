@@ -1,0 +1,12 @@
+FROM alpine:latest AS test
+
+RUN apk add python
+
+WORKDIR /test
+
+COPY handout .
+COPY solve .
+
+RUN chmod +x /test/handout/*
+
+CMD ["sh", "-c", "python /test/solve/solve.py -c $CHALLENGE -f $FLAG -p /test/handout"]
