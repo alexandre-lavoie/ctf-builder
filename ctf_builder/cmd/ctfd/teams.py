@@ -16,7 +16,7 @@ class User:
     banned: bool = dataclasses.field(default=False)
     hidden: bool = dataclasses.field(default=False)
     type: str = dataclasses.field(default="user")
-    verified: bool = dataclasses.field(default=False)
+    verified: bool = dataclasses.field(default=True)
 
     @classmethod
     def from_dict(cls, data: typing.Dict) -> "User":
@@ -149,9 +149,9 @@ def build_team(url: str, api_key: str, team: Team) -> bool:
     return True
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str):
-    parser.add_argument("-u", "--url", help="URL for CTFd", required=True)
-    parser.add_argument("-f", "--file", help="Config file path", default=os.path.join(root_directory, "ctfd", "teams.json"))
     parser.add_argument("-k", "--api_key", help="API Key", required=True)
+    parser.add_argument("-u", "--url", help="URL for CTFd", default="http://localhost:8000")
+    parser.add_argument("-f", "--file", help="Config file path", default=os.path.join(root_directory, "ctfd", "teams.json"))
     parser.add_argument("-o", "--output", help="Output file", default=os.path.join(root_directory, "ctfd", "teams.out.json"))
 
 def cli(args, root_directory: str) -> bool:

@@ -130,10 +130,10 @@ def build_setup(url: str, file: str, name: str, email: str, password: str) -> bo
     return res.status_code == 200
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str):
-    parser.add_argument("-u", "--url", help="URL for CTFd", required=True)
+    parser.add_argument("-p", "--password", help="Admin account password", required=True)
+    parser.add_argument("-u", "--url", help="URL for CTFd", default="http://localhost:8000")
     parser.add_argument("-n", "--name", help="Admin account name", default="admin")
     parser.add_argument("-e", "--email", help="Admin account email", default="admin@ctf.com")
-    parser.add_argument("-p", "--password", help="Admin account password", required=True)
     parser.add_argument("-f", "--file", help="Config file path", default=os.path.join(root_directory, "ctfd", "setup.json"))
 
 def cli(args, root_directory: str) -> bool:

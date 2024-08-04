@@ -1,5 +1,6 @@
 import abc
 import dataclasses
+import enum
 import os
 import typing
 
@@ -69,8 +70,16 @@ class FileMap:
     destination: PathFile = dataclasses.field(metadata=_meta_comment("Path to target system"))
 
 @dataclasses.dataclass(frozen=True)
+class PortProtocol(enum.Enum):
+    HTTP="http"
+    HTTPS="https"
+    TCP="tcp"
+    UDP="udp"
+
+@dataclasses.dataclass(frozen=True)
 class Port:
     port: int = dataclasses.field(metadata=_meta_comment("Port value"))
+    protocol: PortProtocol = dataclasses.field(default=PortProtocol.TCP, metadata=_meta_comment("Protocol to use for port"))
     public: bool = dataclasses.field(default=False, metadata=_meta_comment("Is this port exposed to the internet?"))
 
 @dataclasses.dataclass(frozen=True)
@@ -103,7 +112,7 @@ class Deployer(abc.ABC):
 
 @dataclasses.dataclass(frozen=True)
 class DeployerDocker(Deployer):
-    hostname: str = dataclasses.field(metadata=_meta_comment("Hostname on network"))
+    name: str = dataclasses.field(metadata=_meta_comment("Hostname on network"))
     path: typing.Optional[PathFile] = dataclasses.field(default=None, metadata=_meta_comment("Path to Dockerfile"))
     args: typing.List[Args] = dataclasses.field(default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile"))
     env: typing.List[Args] = dataclasses.field(default_factory=list, metadata=_meta_comment("Environments for Dockerfile"))
@@ -121,11 +130,17 @@ class ChallengeHint:
     cost: int = dataclasses.field(default=0, metadata=_meta_comment("Cost of hint"))
 
 @dataclasses.dataclass(frozen=True)
+class ChallengeHost:
+    index: int = dataclasses.field(metadata=_meta_comment("Index of host in deploy array"))
+    path: str = dataclasses.field(default="", metadata=_meta_comment("Path to resource"))
+
+@dataclasses.dataclass(frozen=True)
 class Challenge:
     category: str = dataclasses.field(metadata=_meta_comment("Category of challenge"))
     name: typing.Optional[str] = dataclasses.field(default=None, metadata=_meta_comment("Subname of challenge, prefixed by track name"))
     descriptions: typing.List[Translation] = dataclasses.field(default_factory=list, metadata=_meta_comment("Translated description texts"))
     value: int = dataclasses.field(default=0, metadata=_meta_comment("Point value of challenge"))
+    host: typing.Optional[ChallengeHost] = dataclasses.field(default=None, metadata=_meta_comment("Host of challenge"))
     flags: typing.List[ChallengeFlag] = dataclasses.field(default_factory=list, metadata=_meta_comment("Flags for challenge"))
     hints: typing.List[ChallengeHint] = dataclasses.field(default_factory=list, metadata=_meta_comment("Hints for challenge"))
     attachments: typing.List[Attachment] = dataclasses.field(default_factory=list, metadata=_meta_comment("Attachments file/directory to challenge"))

@@ -59,6 +59,9 @@
     {
       "name": "2",
       "category": "Reverse Engineering",
+      "host": {
+        "index": 0
+      },
       "value": 2,
       "descriptions": [
         {
@@ -101,12 +104,29 @@
   "deploy": [
     {
       "$type": "docker",
-      "hostname": "sample",
+      "name": "sample",
       "path": "challenge/1/Dockerfile",
       "ports": [
         {
           "port": 9001,
+          "protocol": "tcp",
           "public": true
+        }
+      ],
+      "args": [
+        {
+          "$type": "map",
+          "map": {
+            "BUILD": "BUILD"
+          }
+        }
+      ],
+      "env": [
+        {
+          "$type": "map",
+          "map": {
+            "FLAG2": "flag-2"
+          }
         }
       ]
     }

@@ -7,11 +7,11 @@ import typing
 
 import docker
 
-from ..build import *
-from ..error import BuildError, SkipError, LibError, print_errors
+from ..build import BuildBuilder, BuildContext
+from ..error import BuildError, SkipError, LibError, print_errors, get_exit_status
 from ..parse import parse_track
 
-def build_challenge(json_path: str, skip_active: bool, docker_client: typing.Optional[docker.APIClient] = None) -> typing.Sequence[typing.Union[LibError]]:
+def build_challenge(json_path: str, skip_active: bool, docker_client: typing.Optional[docker.DockerClient] = None) -> typing.Sequence[typing.Union[LibError]]:
     if not os.path.exists(json_path):
         return [BuildError("file not found")]
 
@@ -31,14 +31,13 @@ def build_challenge(json_path: str, skip_active: bool, docker_client: typing.Opt
     if not skip_active and not track.active:
         return [SkipError()]
 
-    errors = []
-    for i, builder in enumerate(track.build):
-        context = BuildContext(
-            name=f"{track.name}-{i}",
-            path=os.path.dirname(json_path),
-            docker_client=docker_client
-        )
+    context = BuildContext(
+        path=os.path.dirname(json_path),
+        docker_client=docker_client
+    )
 
+    errors = []
+    for builder in track.build:
         bb = BuildBuilder.get(builder)
         if bb is None:
             errors.append(BuildError(f"unhandled {type(builder)}"))
@@ -48,7 +47,7 @@ def build_challenge(json_path: str, skip_active: bool, docker_client: typing.Opt
 
     return errors
 
-def build_challenges(root: str, docker_client: typing.Optional[docker.APIClient] = None) -> typing.Mapping[str, typing.Sequence[LibError]]:
+def build_challenges(root: str, docker_client: typing.Optional[docker.DockerClient] = None) -> typing.Mapping[str, typing.Sequence[LibError]]:
     if not os.path.isdir(root):
         return {
             "": [BuildError("challenges directory not found")]
@@ -72,20 +71,17 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 def cli(args, root_directory: str) -> bool:
     challenge_directory = os.path.join(root_directory, "challenges")
 
-    docker_client = docker.APIClient()
+    docker_client = docker.from_env()
 
+    all_errors = []
     if args.challenge:
         path = os.path.join(challenge_directory, args.challenge, "challenge.json")
-        errors = build_challenge(path, skip_active=True, docker_client=docker_client)
+        all_errors = build_challenge(path, skip_active=True, docker_client=docker_client)
 
-        is_ok = False if errors else True
-        print_errors(None, errors)
+        print_errors(None, all_errors)
     else:
-        is_ok = True
         for path, errors in build_challenges(challenge_directory, docker_client=docker_client).items():
-            if errors:
-                is_ok = False
+            all_errors += errors
+            print_errors(os.path.basename(os.path.dirname(path)), errors)
 
-            print_errors(path, errors)
-
-    return is_ok
+    return get_exit_status(all_errors)

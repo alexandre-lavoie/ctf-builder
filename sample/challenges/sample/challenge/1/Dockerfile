@@ -1,6 +1,4 @@
-FROM alpine:latest
-
-RUN apk add python
+FROM python:alpine
 
 WORKDIR /app
 

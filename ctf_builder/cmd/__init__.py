@@ -5,6 +5,12 @@ import typing
 from .build import cli as build_cli
 from .build import cli_args as build_args
 
+from .start import cli as start_cli
+from .start import cli_args as start_args
+
+from .stop import cli as stop_cli
+from .stop import cli_args as stop_args
+
 from .schema import cli as schema_cli
 from .schema import cli_args as schema_args
 
@@ -40,6 +46,16 @@ CLI = Menu(
             help="Build schemas for internal types",
             args=schema_args,
             cli=schema_cli
+        ),
+        "start": Command(
+            help="Deploy challenges",
+            args=start_args,
+            cli=start_cli
+        ),
+        "stop": Command(
+            help="Stop deployed challenges",
+            args=stop_args,
+            cli=stop_cli
         ),
         "ctfd": Menu(
             help="Tools for CTFd",

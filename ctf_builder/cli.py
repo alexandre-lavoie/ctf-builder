@@ -3,6 +3,7 @@ import os
 import os.path
 
 from .cmd import CLI, Command, Menu
+from .logging import LOG, setup_logging
 
 def build_command(subparser: argparse._SubParsersAction, name: str, command: Command, root_directory: str):
     parser = subparser.add_parser(name=name, help=command.help)
@@ -32,8 +33,13 @@ def cli() -> int:
     root_directory = os.environ.get("CTF") or "."
 
     parser = argparse.ArgumentParser()
+
+    parser.add_argument("-v", "--verbose", help="Verbose mode", action="store_true", default=False)
+
     build_menu(parser, CLI, root_directory)
 
     args = parser.parse_args()
+
+    setup_logging(LOG, args.verbose)
 
     return 0 if run_menu(args, CLI, root_directory) else 1
