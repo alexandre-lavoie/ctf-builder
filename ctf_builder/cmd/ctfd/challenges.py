@@ -8,10 +8,10 @@ import typing
 
 import requests
 
-from ..build import *
-from ..error import LibError, BuildError, SkipError, print_errors
-from ..parse import parse_track
-from ..schema import *
+from ...build import *
+from ...error import LibError, BuildError, SkipError, print_errors
+from ...parse import parse_track
+from ...schema import *
 
 def build_translation(root: str, translations: typing.Sequence[Translation]) -> typing.Optional[str]:
     priority_texts = []
