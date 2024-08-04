@@ -13,6 +13,10 @@ class BuildError(LibError):
     msg: str
 
 @dataclasses.dataclass
+class DeployError(LibError):
+    msg: str
+
+@dataclasses.dataclass
 class ParseError(LibError):
     path: str
     expected: typing.List[str]
@@ -40,5 +44,7 @@ def print_errors(path: str, errors: typing.Sequence[typing.Union[LibError]]) -> 
                 print(f"- Parse: path {error.path} > expected [{", ".join(error.expected)}]")
             elif isinstance(error, BuildError):
                 print(f"- Build: {error.msg}")
+            elif isinstance(error, DeployError):
+                print(f"- Deploy: {error.msg}")
             else:
                 print(f"- {type(error)}: {error}")

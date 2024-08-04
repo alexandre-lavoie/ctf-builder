@@ -3,10 +3,9 @@ import argparse
 import dataclasses
 import enum
 import json
-import os.path
 import typing
 
-from ..lib import Track, Path
+from ..schema import Track, Path
 
 ATOM_TYPES = {
     str: "string",

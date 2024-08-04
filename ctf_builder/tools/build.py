@@ -5,9 +5,13 @@ import os
 import os.path
 import typing
 
-from ..lib import *
+import docker
 
-def build_challenge(json_path: str, skip_active: bool) -> typing.Sequence[typing.Union[LibError]]:
+from ..build import *
+from ..error import BuildError, SkipError, LibError, print_errors
+from ..parse import parse_track
+
+def build_challenge(json_path: str, skip_active: bool, docker_client: typing.Optional[docker.APIClient] = None) -> typing.Sequence[typing.Union[LibError]]:
     if not os.path.exists(json_path):
         return [BuildError("file not found")]
 
@@ -31,7 +35,8 @@ def build_challenge(json_path: str, skip_active: bool) -> typing.Sequence[typing
     for i, builder in enumerate(track.build):
         context = BuildContext(
             name=f"{track.name}-{i}",
-            path=os.path.dirname(json_path)
+            path=os.path.dirname(json_path),
+            docker_client=docker_client
         )
 
         bb = BuildBuilder.get(builder)
@@ -43,7 +48,7 @@ def build_challenge(json_path: str, skip_active: bool) -> typing.Sequence[typing
 
     return errors
 
-def build_challenges(root: str) -> typing.Mapping[str, typing.Sequence[LibError]]:
+def build_challenges(root: str, docker_client: typing.Optional[docker.APIClient] = None) -> typing.Mapping[str, typing.Sequence[LibError]]:
     if not os.path.isdir(root):
         return {
             "": [BuildError("challenges directory not found")]
@@ -53,7 +58,7 @@ def build_challenges(root: str) -> typing.Mapping[str, typing.Sequence[LibError]
     for file in glob.glob("**/challenge.json", root_dir=root, recursive=True):
         path = os.path.join(root, file)
 
-        out[path] = build_challenge(path, skip_active=False)
+        out[path] = build_challenge(path, skip_active=False, docker_client=docker_client)
 
     return out
 
@@ -67,15 +72,17 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 def cli(args, root_directory: str) -> bool:
     challenge_directory = os.path.join(root_directory, "challenges")
 
+    docker_client = docker.APIClient()
+
     if args.challenge:
         path = os.path.join(challenge_directory, args.challenge, "challenge.json")
-        errors = build_challenge(path, skip_active=True)
+        errors = build_challenge(path, skip_active=True, docker_client=docker_client)
 
         is_ok = False if errors else True
         print_errors(None, errors)
     else:
         is_ok = True
-        for path, errors in build_challenges(challenge_directory).items():
+        for path, errors in build_challenges(challenge_directory, docker_client=docker_client).items():
             if errors:
                 is_ok = False
 

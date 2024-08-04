@@ -98,6 +98,19 @@
       "prerequisites": [0]
     }
   ],
+  "deploy": [
+    {
+      "$type": "docker",
+      "hostname": "sample",
+      "path": "challenge/1/Dockerfile",
+      "ports": [
+        {
+          "port": 9001,
+          "public": true
+        }
+      ]
+    }
+  ],
   "build": [
     {
       "$type": "docker",
