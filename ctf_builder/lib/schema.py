@@ -93,19 +93,6 @@ class BuilderDocker(Builder):
     args: typing.List[Args] = dataclasses.field(default_factory=list, metadata=meta_comment("Build arguments for Dockerfile"))
     files: typing.List[FileMap] = dataclasses.field(default_factory=list, metadata=meta_comment("Files to map after build"))
 
-class ChallengeCategory(enum.Enum):
-    Web = "web"
-    Pwning = "pwn"
-    Cryptography = "crypto"
-    Steganography = "steg"
-    Reverse_Engineering = "reverse"
-
-    def clean_name(self):
-        if self == self.Reverse_Engineering:
-            return "Reverse Engineering"
-        else:
-            return self.name
-
 @dataclasses.dataclass(frozen=True)
 class ChallengeFlag:
     regex: bool = dataclasses.field(metadata=meta_comment("Is this flag regex?"))
@@ -119,7 +106,7 @@ class ChallengeHint:
 
 @dataclasses.dataclass(frozen=True)
 class Challenge:
-    category: ChallengeCategory = dataclasses.field(metadata=meta_comment("Category of challenge"))
+    category: str = dataclasses.field(metadata=meta_comment("Category of challenge"))
     name: typing.Optional[str] = dataclasses.field(default=None, metadata=meta_comment("Subname of challenge, prefixed by track name"))
     descriptions: typing.List[Translation] = dataclasses.field(default_factory=list, metadata=meta_comment("Translated description texts"))
     value: int = dataclasses.field(default=0, metadata=meta_comment("Point value of challenge"))

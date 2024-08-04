@@ -52,7 +52,7 @@ def build_create_challenges(root: str, track: Track) -> typing.Tuple[typing.List
             ChallengeCreateRequest(
                 name=name,
                 description=description,
-                category=challenge.category.clean_name(),
+                category=challenge.category,
                 value=challenge.value
             )
         )

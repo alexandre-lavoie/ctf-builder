@@ -4,7 +4,7 @@
   "active": true,
   "challenges": [
     {
-      "category": "reverse",
+      "category": "Reverse Engineering",
       "value": 1,
       "descriptions": [
         {
@@ -58,7 +58,7 @@
     },
     {
       "name": "2",
-      "category": "reverse",
+      "category": "Reverse Engineering",
       "value": 2,
       "descriptions": [
         {
