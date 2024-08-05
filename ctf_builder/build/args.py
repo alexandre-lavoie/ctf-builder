@@ -12,7 +12,7 @@ class BuildArgs(abc.ABC):
         return None
 
     @classmethod
-    def get(cls, obj: Args) -> typing.Optional[typing.Type["BuildArgs"]]:
+    def get(cls, obj: Args) -> typing.Type["BuildArgs"]:
         return subclass_get(cls, obj)
 
     @classmethod

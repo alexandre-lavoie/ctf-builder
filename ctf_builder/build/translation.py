@@ -12,7 +12,7 @@ class BuildTranslation(abc.ABC):
         return None
     
     @classmethod
-    def get(cls, obj: Translation) -> typing.Optional[typing.Type["BuildTranslation"]]:
+    def get(cls, obj: Translation) -> typing.Type["BuildTranslation"]:
         return subclass_get(cls, obj)
     
     @classmethod

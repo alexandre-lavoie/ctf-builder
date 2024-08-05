@@ -14,6 +14,10 @@ from ..schema import Deployer, DeployerDocker, PortProtocol
 from .args import BuildArgs
 from .utils import subclass_get
 
+def default_port_generator() -> typing.Generator[typing.Optional[str], None, None]:
+    while True:
+        yield None
+
 @dataclasses.dataclass
 class DeployContext:
     name: str
@@ -21,7 +25,7 @@ class DeployContext:
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(default=None)
     network: typing.Optional[str] = dataclasses.field(default=None)
     host: typing.Optional[str] = dataclasses.field(default=None)
-    next_port: typing.Callable[[], typing.Optional[int]] = dataclasses.field(default_factory=lambda: lambda: None)
+    port_generator: typing.Generator[typing.Optional[str], None, None] = dataclasses.field(default_factory=lambda: default_port_generator())
 
 class BuildDeployer(abc.ABC):
     @classmethod
@@ -30,7 +34,7 @@ class BuildDeployer(abc.ABC):
         return None
     
     @classmethod
-    def get(cls, obj: Deployer) -> typing.Optional[typing.Type["BuildDeployer"]]:
+    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer"]:
         return subclass_get(cls, obj)
     
     @classmethod
@@ -102,14 +106,8 @@ class BuildDeployerDocker(BuildDeployer):
         errors = []
         build_args = {}
         for args in deployer.args:
-            ba = BuildArgs.get(args)
-            if ba is None:
-                errors.append(DeployError(f"unhandled {type(args)}"))
-                continue
-
-            arg_map = ba.build(context.path, args)
-            if arg_map is None:
-                errors.append(f"invalid {type(args)}")
+            if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
+                errors.append("invalid")
                 break 
 
             for key, value in arg_map.items():
@@ -117,14 +115,8 @@ class BuildDeployerDocker(BuildDeployer):
 
         environment = {}
         for env in deployer.env:
-            ba = BuildArgs.get(env)
-            if ba is None:
-                errors.append(DeployError(f"unhandled {type(env)}"))
-                continue
-
-            arg_map = ba.build(context.path, env)
-            if arg_map is None:
-                errors.append(f"invalid {type(env)}")
+            if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
+                errors.append("invalid")
                 break 
 
             for key, value in arg_map.items():
@@ -150,10 +142,8 @@ class BuildDeployerDocker(BuildDeployer):
             if not port.public:
                 continue
 
-            bind_port = context.next_port()
-
             if context.host:
-                port_bindings[port.port] = (context.host, bind_port)
+                port_bindings[port.port] = (context.host, next(context.port_generator))
 
         if errors:
             return errors

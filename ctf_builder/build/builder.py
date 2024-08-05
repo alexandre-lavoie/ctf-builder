@@ -26,7 +26,7 @@ class BuildBuilder(abc.ABC):
         return None
 
     @classmethod
-    def get(cls, obj: Builder) -> typing.Optional[typing.Type["BuildBuilder"]]:
+    def get(cls, obj: Builder) -> typing.Type["BuildBuilder"]:
         return subclass_get(cls, obj)
 
     @classmethod
@@ -57,14 +57,8 @@ class BuildBuilderDocker(BuildBuilder):
         errors = []
         build_args = {}
         for args in builder.args:
-            ba = BuildArgs.get(args)
-            if ba is None:
-                errors.append(BuildError(f"unhandled {type(args)}"))
-                continue
-
-            arg_map = ba.build(context.path, args)
-            if arg_map is None:
-                errors.append(f"invalid {type(args)}")
+            if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
+                errors.append("invalid")
                 break 
 
             for key, value in arg_map.items():

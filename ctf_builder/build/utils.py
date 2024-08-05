@@ -6,5 +6,5 @@ def subclass_get(cls: typing.Type[T], obj: U) -> typing.Type[T]:
     for subclass in cls.__subclasses__():
         if subclass.__type__() == type(obj):
             return subclass
-    else:
-        return None
+
+    assert False, f"unhandled {type(obj)}"

@@ -16,7 +16,7 @@ class BuildAttachment(abc.ABC):
         return None
 
     @classmethod
-    def get(cls, obj: Attachment) -> typing.Optional[typing.Type["BuildAttachment"]]:
+    def get(cls, obj: Attachment) -> typing.Type["BuildAttachment"]:
         return subclass_get(cls, obj)
 
     @classmethod

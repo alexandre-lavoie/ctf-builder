@@ -7,12 +7,7 @@ from .args import BuildArgs
 class BuildFlag:
     @classmethod
     def build(cls, root: str, flag: ChallengeFlag) -> typing.List[str]:
-        ba = BuildArgs.get(flag.values)
-        if ba is None:
+        if (args := BuildArgs.get(flag.values).build(root, flag.values)) is None:
             return []
 
-        m = ba.build(root, flag.values)
-        if m is None:
-            return []
-
-        return list(m.values())
+        return list(args.values())
