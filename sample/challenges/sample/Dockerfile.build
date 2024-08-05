@@ -1,0 +1,11 @@
+FROM alpine:latest AS build
+
+RUN apk add build-base
+
+WORKDIR /build
+
+ARG FLAG1
+
+COPY challenge/0/sample.c .
+
+RUN gcc -DFLAG=$FLAG1 sample.c -o sample

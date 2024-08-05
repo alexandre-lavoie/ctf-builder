@@ -1,0 +1,14 @@
+{
+  "teams": [
+    {
+      "name": "team",
+      "email": "team@ctf.com",
+      "users": [
+        {
+          "name": "user",
+          "email": "user@ctf.com"
+        }
+      ]
+    }
+  ]
+}
