@@ -8,26 +8,20 @@ A tool to build, test, and deploy CTFs.
 
 - [Docker](https://docs.docker.com/get-docker/)
 
-### ✋ Manual Installation
+### 🐍 PIP
 
-The package is not yet part of the package manager. The repository has to be manually installed.
-
-```
-git clone https://github.com/alexandre-lavoie/ctf-builder
-```
-
-The repository can be built/installed system wide.
+System-wide:
 
 ```
-pip install .
+pip install ctf-builder
 ```
 
-The repository can also be built/installed in a [venv](https://docs.python.org/3/library/venv.html).
+[venv](https://docs.python.org/3/library/venv.html):
 
 ```
 python -m venv .venv
 source .venv/bin/activate
-pip install .
+pip install ctf-builder
 ```
 
 ## ⚙️ Usage

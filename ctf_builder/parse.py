@@ -1,7 +1,10 @@
+import abc
+import dataclasses
 import enum
+import typing
 
 from .error import ParseError
-from .schema import *
+from .schema import Track, Path
 
 SUBCLASS = typing.TypeVar("SUBCLASS")
 PTYPE = typing.TypeVar("PTYPE")

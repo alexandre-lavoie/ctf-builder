@@ -1,2 +1,2 @@
-requests
-docker
+requests==2.32.3
+docker==7.1.0

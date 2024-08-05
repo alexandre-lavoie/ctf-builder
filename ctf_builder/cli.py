@@ -2,7 +2,7 @@ import argparse
 import os
 import os.path
 
-from .cmd import CLI, Command, Menu
+from .cmd.cli import CLI, Command, Menu
 from .logging import LOG, setup_logging
 
 
