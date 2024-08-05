@@ -31,7 +31,7 @@ def build_translation(
     return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     url: str
     api_key: str
@@ -61,7 +61,7 @@ def build_create_challenges(
 
     deploy_ports = []
     for deployer in track.deploy:
-        ports = BuildDeployer.get(deployer).public_ports(deployer, base_port)
+        ports = BuildDeployer.get(deployer).deploy_ports(deployer, base_port)
 
         deploy_ports.append(ports)
         base_port += len(ports)
@@ -359,6 +359,7 @@ def cli(args, root_directory: str) -> bool:
     context = Context(
         challenge_path="",
         error_prefix="",
+        skip_inactive=False,
         url=args.url,
         api_key=args.api_key,
         port=args.port,

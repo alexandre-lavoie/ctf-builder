@@ -21,6 +21,11 @@ class DeployError(LibError):
 
 
 @dataclasses.dataclass
+class TestError(LibError):
+    msg: str
+
+
+@dataclasses.dataclass
 class ParseError(LibError):
     path: str
     expected: typing.List[str]
@@ -53,6 +58,8 @@ def print_errors(prefix: str, errors: typing.Sequence[typing.Union[LibError]]) -
                 LOG.error(f"- Build: {error.msg}")
             elif isinstance(error, DeployError):
                 LOG.error(f"- Deploy: {error.msg}")
+            elif isinstance(error, TestError):
+                LOG.error(f"- Test: {error.msg}")
             else:
                 LOG.error(f"- {type(error)}: {error}")
 

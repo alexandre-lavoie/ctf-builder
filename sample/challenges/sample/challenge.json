@@ -1,5 +1,5 @@
 {
-  "$schema": "../../../doc/schema.json",
+  "$schema": "../../../schema.json",
   "name": "Sample",
   "active": true,
   "challenges": [
@@ -148,6 +148,13 @@
           "keys": ["FLAG1"]
         }
       ]
+    }
+  ],
+  "test": [
+    {
+      "$type": "docker",
+      "path": "Dockerfile.test",
+      "challenges": [0, 1]
     }
   ]
 }

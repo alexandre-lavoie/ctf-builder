@@ -273,6 +273,36 @@ class DeployerDocker(Deployer):
 
 
 @dataclasses.dataclass(frozen=True)
+class Tester(abc.ABC):
+    """
+    Automation to test challenges
+    """
+
+    pass
+
+
+@dataclasses.dataclass(frozen=True)
+class TesterDocker(Tester):
+    """
+    Testing using Dockerfile.
+    """
+
+    challenges: typing.List[int] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment("Challenges to run test on, all by default"),
+    )
+    path: typing.Optional[PathFile] = dataclasses.field(
+        default=None, metadata=_meta_comment("Path to Dockerfile")
+    )
+    args: typing.List[Args] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile")
+    )
+    env: typing.List[Args] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Environments for Dockerfile")
+    )
+
+
+@dataclasses.dataclass(frozen=True)
 class ChallengeFlag:
     """
     CTFd flag.
@@ -375,4 +405,8 @@ class Track:
         metadata=_meta_comment(
             "Deployment scripts for network challenges, not required"
         ),
+    )
+    test: typing.List[Tester] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment("Test scripts for challenges, not required"),
     )

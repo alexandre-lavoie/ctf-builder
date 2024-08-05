@@ -23,7 +23,7 @@ from .common import (
 )
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     network: docker.models.networks.Network
     port: int
@@ -54,7 +54,7 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
                 name=f"{context.network.name}_{track.name}_{i}",
                 path=context.challenge_path,
                 docker_client=context.docker_client,
-                network=context.network.name,
+                network=context.network.id,
                 host=host,
                 port_generator=next_port,
             ),
@@ -107,6 +107,7 @@ def cli(args, root_directory: str) -> bool:
         context = Context(
             challenge_path="",
             error_prefix=f"{network.name} > " if len(arg_networks) > 1 else "",
+            skip_inactive=False,
             network=network,
             docker_client=docker_client,
             host_generator=next_host,

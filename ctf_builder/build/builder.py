@@ -1,6 +1,8 @@
 import abc
 import dataclasses
+import io
 import os.path
+import tarfile
 import typing
 
 import docker
@@ -67,7 +69,7 @@ class BuildBuilderDocker(BuildBuilder):
         build_args = {}
         for args in builder.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
-                errors.append("invalid")
+                errors.append("invalid build args")
                 break
 
             for key, value in arg_map.items():
@@ -93,26 +95,40 @@ class BuildBuilderDocker(BuildBuilder):
         except docker.errors.APIError as e:
             return errors + [BuildError(f"Dockerfile create failed > {e}")]
 
-        for i, file_map in enumerate(builder.files):
-            source, destination = BuildFileMap.build(file_map)
-            destination = os.path.join(os.path.abspath(context.path), destination)
+        try:
+            for i, file_map in enumerate(builder.files):
+                source, destination = BuildFileMap.build(file_map)
+                destination = os.path.join(os.path.abspath(context.path), destination)
 
-            if os.path.isdir(destination):
-                errors.append(BuildError(f"{i}.destination is a directory"))
-                continue
+                if os.path.isdir(destination):
+                    errors.append(BuildError(f"{i}.destination is a directory"))
+                    continue
 
-            os.makedirs(os.path.dirname(destination), exist_ok=True)
+                os.makedirs(os.path.dirname(destination), exist_ok=True)
 
-            try:
-                res, _ = container.get_archive(source)
-            except docker.errors.NotFound:
-                errors.append(BuildError(f"file {source} not found in container"))
-                continue
+                try:
+                    res, _ = container.get_archive(source)
+                except docker.errors.NotFound:
+                    errors.append(BuildError(f"file {source} not found in container"))
+                    continue
 
-            with open(destination, "wb") as h:
+                tar_data = io.BytesIO()
                 for chunk in res:
-                    h.write(chunk)
+                    tar_data.write(chunk)
+                tar_data.seek(0)
 
-        container.remove(force=True)
+                with tarfile.TarFile.open(fileobj=tar_data, mode="r") as th:
+                    members = th.getmembers()
+                    if len(members) != 1:
+                        errors.append(BuildError("invalid tar file output"))
+                        continue
+
+                    with open(destination, "wb") as dh:
+                        dh.write(th.extractfile(members[0]).read())
+        finally:
+            try:
+                container.remove(force=True)
+            except:
+                pass
 
         return errors

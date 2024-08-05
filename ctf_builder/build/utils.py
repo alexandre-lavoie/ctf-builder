@@ -10,3 +10,7 @@ def subclass_get(cls: typing.Type[T], obj: U) -> typing.Type[T]:
             return subclass
 
     assert False, f"unhandled {type(obj)}"
+
+
+def to_docker_tag(text: str) -> str:
+    return text.replace(" ", "_").lower()

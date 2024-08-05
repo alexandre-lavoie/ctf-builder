@@ -46,7 +46,7 @@ def run_menu(args, menu: Menu, root_directory: str, depth: int = 0) -> bool:
 
 
 def cli() -> int:
-    root_directory = os.environ.get("TARGET") or "."
+    root_directory = os.environ.get("CTF") or "."
 
     parser = argparse.ArgumentParser()
 

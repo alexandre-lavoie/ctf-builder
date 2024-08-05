@@ -2,6 +2,7 @@ import dataclasses
 import glob
 import json
 import os.path
+import threading
 import typing
 
 import docker
@@ -60,10 +61,11 @@ def get_create_network(
     return None
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class WrapContext:
     challenge_path: str
     error_prefix: str
+    skip_inactive: bool
 
 
 def get_challenges(root_directory: str) -> typing.Sequence[str]:
@@ -84,6 +86,50 @@ def get_challenge_index(challenge_path: str) -> int:
     return challenges.index(os.path.basename(challenge_path))
 
 
+def copy_context(
+    context: WrapContext, overrides: typing.Mapping[str, typing.Any]
+) -> WrapContext:
+    fields = {}
+    for field in dataclasses.fields(context.__class__):
+        fields[field.name] = getattr(context, field.name)
+
+    for key, value in overrides.items():
+        fields[key] = value
+
+    return context.__class__(**fields)
+
+
+def cli_challenge(
+    context: WrapContext,
+    callback: typing.Callable[[Track, WrapContext], typing.Sequence[LibError]],
+    errors: typing.List[LibError],
+) -> bool:
+    json_path = os.path.join(context.challenge_path, "challenge.json")
+    if not os.path.isfile(json_path):
+        errors.append(ParseError(json_path, ["existing"]))
+        return False
+
+    try:
+        with open(json_path) as h:
+            raw_track = json.load(h)
+    except:
+        errors.append(ParseError(json_path, ["valid"]))
+        return False
+
+    track, parse_errors = parse_track(raw_track)
+    if parse_errors:
+        errors += parse_errors
+        return False
+
+    if context.skip_inactive and not track.active:
+        errors.append(SkipError())
+        return False
+
+    errors += callback(track, context)
+
+    return not errors
+
+
 def cli_challenge_wrapper(
     root_directory: str,
     challenges: typing.Sequence[str],
@@ -96,35 +142,32 @@ def cli_challenge_wrapper(
     skip_inactive = True if len(challenges) <= 1 else False
 
     error_map: typing.Dict[str, typing.List[LibError]] = {}
+    threads: typing.List[threading.Thread] = []
     for challenge in challenges:
         errors = []
         error_map[challenge] = errors
 
         challenge_path = os.path.join(root_directory, "challenges", challenge)
-        json_path = os.path.join(challenge_path, "challenge.json")
-        if not os.path.isfile(json_path):
-            errors.append(ParseError("challenge.json not found"))
-            continue
+        challenge_context = copy_context(
+            context, {"challenge_path": challenge_path, "skip_inactive": skip_inactive}
+        )
 
-        try:
-            with open(json_path) as h:
-                raw_track = json.load(h)
-        except:
-            errors.append(ParseError("invalid JSON"))
-            continue
+        threads.append(
+            threading.Thread(
+                target=cli_challenge,
+                kwargs={
+                    "context": challenge_context,
+                    "callback": callback,
+                    "errors": errors,
+                },
+            )
+        )
 
-        track, parse_errors = parse_track(raw_track)
-        if parse_errors:
-            errors += parse_errors
-            continue
+    for thread in threads:
+        thread.start()
 
-        if skip_inactive and not track.active:
-            errors.append(SkipError())
-            continue
-
-        context.challenge_path = challenge_path
-
-        errors += callback(track, context)
+    for thread in threads:
+        thread.join()
 
     all_errors = []
     for challenge, errors in error_map.items():

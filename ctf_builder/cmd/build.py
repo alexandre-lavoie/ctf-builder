@@ -14,7 +14,7 @@ from ..schema import Track
 from .common import cli_challenge_wrapper, WrapContext
 
 
-@dataclasses.dataclass
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     docker_client: typing.Optional[docker.DockerClient]
 
@@ -49,7 +49,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 
 def cli(args, root_directory: str) -> bool:
     context = Context(
-        challenge_path="", error_prefix="", docker_client=docker.from_env()
+        challenge_path="",
+        error_prefix="",
+        skip_inactive=False,
+        docker_client=docker.from_env(),
     )
 
     return cli_challenge_wrapper(

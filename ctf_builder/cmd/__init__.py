@@ -14,6 +14,9 @@ from .stop import cli_args as stop_args
 from .schema import cli as schema_cli
 from .schema import cli_args as schema_args
 
+from .test import cli as test_cli
+from .test import cli_args as test_args
+
 from .ctfd.challenges import cli as ctfd_challenges_cli
 from .ctfd.challenges import cli_args as ctfd_challenges_args
 
@@ -43,9 +46,10 @@ CLI = Menu(
     help="Main",
     options={
         "build": Command(help="Build static files", args=build_args, cli=build_cli),
-        "schema": Command(help="Build JSON schemas", args=schema_args, cli=schema_cli),
         "start": Command(help="Start challenges", args=start_args, cli=start_cli),
         "stop": Command(help="Stop challenges", args=stop_args, cli=stop_cli),
+        "schema": Command(help="Build JSON schemas", args=schema_args, cli=schema_cli),
+        "test": Command(help="Test challenges", args=test_args, cli=test_cli),
         "ctfd": Menu(
             help="CTFd integration",
             options={
