@@ -5,3 +5,7 @@
 ```
 pip install .
 ```
+
+```
+ctf -h
+```

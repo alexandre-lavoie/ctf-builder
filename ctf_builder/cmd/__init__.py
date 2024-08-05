@@ -38,27 +38,27 @@ CLI = Menu(
     help="Main",
     options={
         "build": Command(
-            help="Build challenge static files",
+            help="Build static files",
             args=build_args,
             cli=build_cli
         ),
         "schema": Command(
-            help="Build schemas for internal types",
+            help="Build JSON schemas",
             args=schema_args,
             cli=schema_cli
         ),
         "start": Command(
-            help="Deploy challenges",
+            help="Start challenges",
             args=start_args,
             cli=start_cli
         ),
         "stop": Command(
-            help="Stop deployed challenges",
+            help="Stop challenges",
             args=stop_args,
             cli=stop_cli
         ),
         "ctfd": Menu(
-            help="Tools for CTFd",
+            help="CTFd integration",
             options={
                 "init": Command(
                     help="Setup CTFd",

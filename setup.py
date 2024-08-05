@@ -29,7 +29,7 @@ setuptools.setup(
     install_requires=install_requires,
     entry_points={
         "console_scripts": [
-            f"{package_name}={package_name}.cli:cli",
+            f"ctf={package_name}.cli:cli",
         ],
     },
 )
