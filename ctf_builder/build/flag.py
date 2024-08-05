@@ -4,6 +4,7 @@ from ..schema import ChallengeFlag
 
 from .args import BuildArgs
 
+
 class BuildFlag:
     @classmethod
     def build(cls, root: str, flag: ChallengeFlag) -> typing.List[str]:

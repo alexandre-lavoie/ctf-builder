@@ -12,12 +12,16 @@ from ..schema import Builder, BuilderDocker
 
 from .args import BuildArgs
 from .file_map import BuildFileMap
-from .utils import subclass_get 
+from .utils import subclass_get
+
 
 @dataclasses.dataclass
 class BuildContext:
     path: str
-    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(default=None)
+    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
+        default=None
+    )
+
 
 class BuildBuilder(abc.ABC):
     @classmethod
@@ -31,8 +35,11 @@ class BuildBuilder(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, context: BuildContext, builder: Builder) -> typing.Sequence[BuildError]:
+    def build(
+        cls, context: BuildContext, builder: Builder
+    ) -> typing.Sequence[BuildError]:
         return []
+
 
 class BuildBuilderDocker(BuildBuilder):
     @classmethod
@@ -40,7 +47,9 @@ class BuildBuilderDocker(BuildBuilder):
         return BuilderDocker
 
     @classmethod
-    def build(cls, context: BuildContext, builder: BuilderDocker) -> typing.Sequence[BuildError]:
+    def build(
+        cls, context: BuildContext, builder: BuilderDocker
+    ) -> typing.Sequence[BuildError]:
         if context.docker_client is None:
             return [BuildError("No docker client")]
 
@@ -51,7 +60,7 @@ class BuildBuilderDocker(BuildBuilder):
 
         if dockerfile is None or not os.path.exists(dockerfile):
             return [BuildError("Dockerfile is invalid")]
-        
+
         dockerfile = os.path.abspath(dockerfile)
 
         errors = []
@@ -59,7 +68,7 @@ class BuildBuilderDocker(BuildBuilder):
         for args in builder.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
                 errors.append("invalid")
-                break 
+                break
 
             for key, value in arg_map.items():
                 build_args[key] = value
@@ -68,7 +77,7 @@ class BuildBuilderDocker(BuildBuilder):
             image, logs = context.docker_client.images.build(
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
-                buildargs=build_args
+                buildargs=build_args,
             )
 
             for log in logs:

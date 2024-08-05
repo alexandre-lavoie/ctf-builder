@@ -9,6 +9,7 @@ from ..schema import Attachment, AttachmentFile, AttachmentDirectory
 
 from .utils import subclass_get
 
+
 class BuildAttachment(abc.ABC):
     @classmethod
     @abc.abstractmethod
@@ -21,8 +22,11 @@ class BuildAttachment(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, root: str, attachment: Attachment) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
+    def build(
+        cls, root: str, attachment: Attachment
+    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
         return []
+
 
 class BuildAttachmentFile(BuildAttachment):
     @classmethod
@@ -30,11 +34,13 @@ class BuildAttachmentFile(BuildAttachment):
         return AttachmentFile
 
     @classmethod
-    def build(cls, root: str, file: AttachmentFile) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
+    def build(
+        cls, root: str, file: AttachmentFile
+    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
         path = file.path.resolve(root)
         if path is None:
             return None
-        
+
         with open(path, "rb") as h:
             data = h.read()
 
@@ -45,13 +51,16 @@ class BuildAttachmentFile(BuildAttachment):
 
         return name, io.BytesIO(data)
 
+
 class BuildAttachmentDirectory(BuildAttachment):
     @classmethod
     def __type__(cls) -> typing.Type[Attachment]:
         return AttachmentDirectory
 
     @classmethod
-    def build(cls, root: str, directory: AttachmentDirectory) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
+    def build(
+        cls, root: str, directory: AttachmentDirectory
+    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
         path = directory.path.resolve(root)
         if path is None:
             return None

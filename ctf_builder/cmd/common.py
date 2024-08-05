@@ -13,12 +13,16 @@ from ..error import ParseError, LibError, SkipError, print_errors, get_exit_stat
 from ..parse import parse_track
 from ..schema import Track
 
-def host_generator(ips: typing.Sequence[str]) -> typing.Generator[typing.Optional[str], None, None]:
+
+def host_generator(
+    ips: typing.Sequence[str],
+) -> typing.Generator[typing.Optional[str], None, None]:
     for ip in ips:
         yield ip
 
     while True:
         yield None
+
 
 def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, None]:
     for next_port in range(port, port + CHALLENGE_MAX_PORTS):
@@ -27,7 +31,10 @@ def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, No
     while True:
         yield None
 
-def get_network(client: docker.DockerClient, name: typing.Optional[str] = None) -> typing.Optional[docker.models.networks.Network]:
+
+def get_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
     try:
         return client.networks.get(name)
     except docker.errors.NotFound:
@@ -37,7 +44,10 @@ def get_network(client: docker.DockerClient, name: typing.Optional[str] = None) 
 
     return None
 
-def get_create_network(client: docker.DockerClient, name: typing.Optional[str] = None) -> typing.Optional[docker.models.networks.Network]:
+
+def get_create_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
     network = get_network(client, name)
     if network is not None:
         return network
@@ -49,10 +59,12 @@ def get_create_network(client: docker.DockerClient, name: typing.Optional[str] =
 
     return None
 
+
 @dataclasses.dataclass
 class WrapContext:
     challenge_path: str
     error_prefix: str
+
 
 def get_challenges(root_directory: str) -> typing.Sequence[str]:
     if not os.path.isdir(root_directory):
@@ -66,15 +78,17 @@ def get_challenges(root_directory: str) -> typing.Sequence[str]:
 
     return out
 
+
 def get_challenge_index(challenge_path: str) -> int:
     challenges = get_challenges(os.path.basename(os.path.basename(challenge_path)))
     return challenges.index(os.path.basename(challenge_path))
 
+
 def cli_challenge_wrapper(
-    root_directory: str, 
-    challenges: typing.Sequence[str], 
-    context: WrapContext, 
-    callback: typing.Callable[[Track, WrapContext], typing.Sequence[LibError]]
+    root_directory: str,
+    challenges: typing.Sequence[str],
+    context: WrapContext,
+    callback: typing.Callable[[Track, WrapContext], typing.Sequence[LibError]],
 ) -> bool:
     if not challenges:
         challenges = get_challenges(root_directory)

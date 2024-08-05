@@ -5,6 +5,7 @@ from ..schema import Args, ArgsList, ArgsMap, ArgsEnv
 
 from .utils import subclass_get
 
+
 class BuildArgs(abc.ABC):
     @classmethod
     @abc.abstractmethod
@@ -20,23 +21,26 @@ class BuildArgs(abc.ABC):
     def build(cls, root: str, args: Args) -> typing.Optional[typing.Dict[str, str]]:
         return {}
 
+
 class BuildArgsList(BuildArgs):
     @classmethod
     def __type__(cls) -> typing.Type[Args]:
         return ArgsList
-    
+
     @classmethod
     def build(cls, root: str, args: ArgsList) -> typing.Optional[typing.Dict[str, str]]:
-        return {str(i):v for i, v in enumerate(args.list)}
+        return {str(i): v for i, v in enumerate(args.list)}
+
 
 class BuildArgsMap(BuildArgs):
     @classmethod
     def __type__(cls) -> typing.Type[Args]:
         return ArgsMap
-    
+
     @classmethod
     def build(cls, root: str, args: ArgsMap) -> typing.Optional[typing.Dict[str, str]]:
         return args.map
+
 
 class BuildArgsEnv(BuildArgs):
     @classmethod
@@ -48,7 +52,7 @@ class BuildArgsEnv(BuildArgs):
         path = args.path.resolve(root)
         if path is None:
             return None
-        
+
         with open(path) as h:
             data = h.read()
 
@@ -60,7 +64,7 @@ class BuildArgsEnv(BuildArgs):
             except ValueError:
                 continue
 
-            key, value = line[:offset], line[offset + 1:]
+            key, value = line[:offset], line[offset + 1 :]
             if key_set and key not in key_set:
                 continue
 

@@ -4,12 +4,14 @@ import enum
 import os
 import typing
 
+
 def _meta_comment(comment: str) -> typing.Dict[str, str]:
     """
     Applies a comment to dataclasses.field to be used in documentation.
     """
 
     return {"comment": comment}
+
 
 @dataclasses.dataclass(frozen=True)
 class Path(abc.ABC):
@@ -27,6 +29,7 @@ class Path(abc.ABC):
 
         return None
 
+
 @dataclasses.dataclass(frozen=True)
 class PathFile(Path):
     """
@@ -38,8 +41,9 @@ class PathFile(Path):
 
         if not os.path.isfile(path):
             return None
-        
+
         return path
+
 
 @dataclasses.dataclass(frozen=True)
 class PathDirectory(Path):
@@ -52,8 +56,9 @@ class PathDirectory(Path):
 
         if not os.path.isdir(path):
             return None
-        
+
         return path
+
 
 @dataclasses.dataclass(frozen=True)
 class Translation(abc.ABC):
@@ -61,7 +66,10 @@ class Translation(abc.ABC):
     Translatable text.
     """
 
-    path: PathFile = dataclasses.field(metadata=_meta_comment("Path to translated markdown"))
+    path: PathFile = dataclasses.field(
+        metadata=_meta_comment("Path to translated markdown")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class TranslationFrench(Translation):
@@ -71,6 +79,7 @@ class TranslationFrench(Translation):
 
     pass
 
+
 @dataclasses.dataclass(frozen=True)
 class TranslationEnglish(Translation):
     """
@@ -78,6 +87,7 @@ class TranslationEnglish(Translation):
     """
 
     pass
+
 
 @dataclasses.dataclass(frozen=True)
 class Args(abc.ABC):
@@ -87,13 +97,17 @@ class Args(abc.ABC):
 
     pass
 
+
 @dataclasses.dataclass(frozen=True)
 class ArgsMap(Args):
     """
     Arguments defined as a map.
     """
 
-    map: typing.Dict[str, str] = dataclasses.field(metadata=_meta_comment("Dictionary of key/value pairs"))
+    map: typing.Dict[str, str] = dataclasses.field(
+        metadata=_meta_comment("Dictionary of key/value pairs")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class ArgsList(Args):
@@ -103,14 +117,23 @@ class ArgsList(Args):
 
     list: typing.List[str] = dataclasses.field(metadata=_meta_comment("List of values"))
 
+
 @dataclasses.dataclass(frozen=True)
 class ArgsEnv(Args):
     """
     Arguments defined in a key/value part (env) file.
     """
 
-    path: PathFile = dataclasses.field(metadata=_meta_comment("Path to key/value pairs file"))
-    keys: typing.List[str] = dataclasses.field(default_factory=list, metadata=_meta_comment("Keys to use in key/value pair file, empty selects all keys"))
+    path: PathFile = dataclasses.field(
+        metadata=_meta_comment("Path to key/value pairs file")
+    )
+    keys: typing.List[str] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment(
+            "Keys to use in key/value pair file, empty selects all keys"
+        ),
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class FileMap:
@@ -118,8 +141,13 @@ class FileMap:
     Mapping to move a source file to a destination.
     """
 
-    source: PathFile = dataclasses.field(metadata=_meta_comment("Path from source system"))
-    destination: PathFile = dataclasses.field(metadata=_meta_comment("Path to target system"))
+    source: PathFile = dataclasses.field(
+        metadata=_meta_comment("Path from source system")
+    )
+    destination: PathFile = dataclasses.field(
+        metadata=_meta_comment("Path to target system")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class PortProtocol(enum.Enum):
@@ -127,10 +155,11 @@ class PortProtocol(enum.Enum):
     Type of protocol the port uses.
     """
 
-    HTTP="http"
-    HTTPS="https"
-    TCP="tcp"
-    UDP="udp"
+    HTTP = "http"
+    HTTPS = "https"
+    TCP = "tcp"
+    UDP = "udp"
+
 
 @dataclasses.dataclass(frozen=True)
 class Port:
@@ -139,8 +168,13 @@ class Port:
     """
 
     port: int = dataclasses.field(metadata=_meta_comment("Port value"))
-    protocol: PortProtocol = dataclasses.field(default=PortProtocol.TCP, metadata=_meta_comment("Protocol to use for port"))
-    public: bool = dataclasses.field(default=False, metadata=_meta_comment("Is this port exposed to the internet?"))
+    protocol: PortProtocol = dataclasses.field(
+        default=PortProtocol.TCP, metadata=_meta_comment("Protocol to use for port")
+    )
+    public: bool = dataclasses.field(
+        default=False, metadata=_meta_comment("Is this port exposed to the internet?")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class Attachment(abc.ABC):
@@ -150,14 +184,20 @@ class Attachment(abc.ABC):
 
     pass
 
+
 @dataclasses.dataclass(frozen=True)
 class AttachmentFile(Attachment):
     """
     File resource.
     """
 
-    path: PathFile = dataclasses.field(metadata=_meta_comment("Path to attachment file"))
-    name: typing.Optional[str] = dataclasses.field(default=None, metadata=_meta_comment("Name of the attachment, if not file.ext"))
+    path: PathFile = dataclasses.field(
+        metadata=_meta_comment("Path to attachment file")
+    )
+    name: typing.Optional[str] = dataclasses.field(
+        default=None, metadata=_meta_comment("Name of the attachment, if not file.ext")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class AttachmentDirectory(Attachment):
@@ -165,8 +205,16 @@ class AttachmentDirectory(Attachment):
     Directory resource. Intended to be used to select files recursively.
     """
 
-    path: PathDirectory = dataclasses.field(metadata=_meta_comment("Path to attachment directory that will be converted to zip"))
-    name: typing.Optional[str] = dataclasses.field(default=None, metadata=_meta_comment("Name of the attachment, if not directory.zip"))
+    path: PathDirectory = dataclasses.field(
+        metadata=_meta_comment(
+            "Path to attachment directory that will be converted to zip"
+        )
+    )
+    name: typing.Optional[str] = dataclasses.field(
+        default=None,
+        metadata=_meta_comment("Name of the attachment, if not directory.zip"),
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class Builder(abc.ABC):
@@ -176,15 +224,23 @@ class Builder(abc.ABC):
 
     pass
 
+
 @dataclasses.dataclass(frozen=True)
 class BuilderDocker(Builder):
     """
     Builder using Dockerfiles.
     """
 
-    path: typing.Optional[PathFile] = dataclasses.field(default=None, metadata=_meta_comment("Path to Dockerfile"))
-    args: typing.List[Args] = dataclasses.field(default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile"))
-    files: typing.List[FileMap] = dataclasses.field(default_factory=list, metadata=_meta_comment("Files to map after build"))
+    path: typing.Optional[PathFile] = dataclasses.field(
+        default=None, metadata=_meta_comment("Path to Dockerfile")
+    )
+    args: typing.List[Args] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile")
+    )
+    files: typing.List[FileMap] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Files to map after build")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class Deployer(abc.ABC):
@@ -194,6 +250,7 @@ class Deployer(abc.ABC):
 
     pass
 
+
 @dataclasses.dataclass(frozen=True)
 class DeployerDocker(Deployer):
     """
@@ -201,10 +258,19 @@ class DeployerDocker(Deployer):
     """
 
     name: str = dataclasses.field(metadata=_meta_comment("Hostname on network"))
-    path: typing.Optional[PathFile] = dataclasses.field(default=None, metadata=_meta_comment("Path to Dockerfile"))
-    args: typing.List[Args] = dataclasses.field(default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile"))
-    env: typing.List[Args] = dataclasses.field(default_factory=list, metadata=_meta_comment("Environments for Dockerfile"))
-    ports: typing.List[Port] = dataclasses.field(default_factory=list, metadata=_meta_comment("Ports for deployment"))
+    path: typing.Optional[PathFile] = dataclasses.field(
+        default=None, metadata=_meta_comment("Path to Dockerfile")
+    )
+    args: typing.List[Args] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Build arguments for Dockerfile")
+    )
+    env: typing.List[Args] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Environments for Dockerfile")
+    )
+    ports: typing.List[Port] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Ports for deployment")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class ChallengeFlag:
@@ -213,8 +279,11 @@ class ChallengeFlag:
     """
 
     regex: bool = dataclasses.field(metadata=_meta_comment("Is this flag regex?"))
-    case_sensitive: bool = dataclasses.field(metadata=_meta_comment("Is this flag case sensitive?"))
+    case_sensitive: bool = dataclasses.field(
+        metadata=_meta_comment("Is this flag case sensitive?")
+    )
     values: Args
+
 
 @dataclasses.dataclass(frozen=True)
 class ChallengeHint:
@@ -222,8 +291,11 @@ class ChallengeHint:
     CTFd hint.
     """
 
-    texts: typing.List[Translation] = dataclasses.field(metadata=_meta_comment("Translated hint texts"))
+    texts: typing.List[Translation] = dataclasses.field(
+        metadata=_meta_comment("Translated hint texts")
+    )
     cost: int = dataclasses.field(default=0, metadata=_meta_comment("Cost of hint"))
+
 
 @dataclasses.dataclass(frozen=True)
 class ChallengeHost:
@@ -231,8 +303,13 @@ class ChallengeHost:
     Connection for challenge to associated Deployer.
     """
 
-    index: int = dataclasses.field(metadata=_meta_comment("Index of host in deploy array"))
-    path: str = dataclasses.field(default="", metadata=_meta_comment("Path to resource"))
+    index: int = dataclasses.field(
+        metadata=_meta_comment("Index of host in deploy array")
+    )
+    path: str = dataclasses.field(
+        default="", metadata=_meta_comment("Path to resource")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class Challenge:
@@ -241,15 +318,37 @@ class Challenge:
     """
 
     category: str = dataclasses.field(metadata=_meta_comment("Category of challenge"))
-    name: typing.Optional[str] = dataclasses.field(default=None, metadata=_meta_comment("Subname of challenge, prefixed by track name"))
-    descriptions: typing.List[Translation] = dataclasses.field(default_factory=list, metadata=_meta_comment("Translated description texts"))
-    value: int = dataclasses.field(default=0, metadata=_meta_comment("Point value of challenge"))
-    host: typing.Optional[ChallengeHost] = dataclasses.field(default=None, metadata=_meta_comment("Host of challenge"))
-    flags: typing.List[ChallengeFlag] = dataclasses.field(default_factory=list, metadata=_meta_comment("Flags for challenge"))
-    hints: typing.List[ChallengeHint] = dataclasses.field(default_factory=list, metadata=_meta_comment("Hints for challenge"))
-    attachments: typing.List[Attachment] = dataclasses.field(default_factory=list, metadata=_meta_comment("Attachments file/directory to challenge"))
-    prerequisites: typing.List[int] = dataclasses.field(default_factory=list, metadata=_meta_comment("Offset in track of previous prerequisit challenges"))
-    next: typing.Optional[int] = dataclasses.field(default=None, metadata=_meta_comment("Next challenge"))
+    name: typing.Optional[str] = dataclasses.field(
+        default=None,
+        metadata=_meta_comment("Subname of challenge, prefixed by track name"),
+    )
+    descriptions: typing.List[Translation] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Translated description texts")
+    )
+    value: int = dataclasses.field(
+        default=0, metadata=_meta_comment("Point value of challenge")
+    )
+    host: typing.Optional[ChallengeHost] = dataclasses.field(
+        default=None, metadata=_meta_comment("Host of challenge")
+    )
+    flags: typing.List[ChallengeFlag] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Flags for challenge")
+    )
+    hints: typing.List[ChallengeHint] = dataclasses.field(
+        default_factory=list, metadata=_meta_comment("Hints for challenge")
+    )
+    attachments: typing.List[Attachment] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment("Attachments file/directory to challenge"),
+    )
+    prerequisites: typing.List[int] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment("Offset in track of previous prerequisit challenges"),
+    )
+    next: typing.Optional[int] = dataclasses.field(
+        default=None, metadata=_meta_comment("Next challenge")
+    )
+
 
 @dataclasses.dataclass(frozen=True)
 class Track:
@@ -258,7 +357,22 @@ class Track:
     """
 
     name: str = dataclasses.field(metadata=_meta_comment("Name of track/challenge"))
-    active: typing.Optional[bool] = dataclasses.field(default=False, metadata=_meta_comment("Is this track ready to be used?"))
-    challenges: typing.List[Challenge] = dataclasses.field(default_factory=list, metadata=_meta_comment("Challenges for this track, can be a single challenge"))
-    build: typing.List[Builder] = dataclasses.field(default_factory=list, metadata=_meta_comment("Build scripts for static file challenges, not required"))
-    deploy: typing.List[Deployer] = dataclasses.field(default_factory=list, metadata=_meta_comment("Deployment scripts for network challenges, not required"))
+    active: typing.Optional[bool] = dataclasses.field(
+        default=False, metadata=_meta_comment("Is this track ready to be used?")
+    )
+    challenges: typing.List[Challenge] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment("Challenges for this track, can be a single challenge"),
+    )
+    build: typing.List[Builder] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment(
+            "Build scripts for static file challenges, not required"
+        ),
+    )
+    deploy: typing.List[Deployer] = dataclasses.field(
+        default_factory=list,
+        metadata=_meta_comment(
+            "Deployment scripts for network challenges, not required"
+        ),
+    )

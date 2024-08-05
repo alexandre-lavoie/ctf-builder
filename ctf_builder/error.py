@@ -1,30 +1,35 @@
 import abc
 import dataclasses
-import os.path
 import typing
 
 from .logging import LOG
+
 
 @dataclasses.dataclass
 class LibError(abc.ABC):
     pass
 
+
 @dataclasses.dataclass
 class BuildError(LibError):
     msg: str
 
+
 @dataclasses.dataclass
 class DeployError(LibError):
     msg: str
+
 
 @dataclasses.dataclass
 class ParseError(LibError):
     path: str
     expected: typing.List[str]
 
+
 @dataclasses.dataclass
 class SkipError(LibError):
     pass
+
 
 def print_errors(prefix: str, errors: typing.Sequence[typing.Union[LibError]]) -> None:
     if not prefix:
@@ -41,13 +46,16 @@ def print_errors(prefix: str, errors: typing.Sequence[typing.Union[LibError]]) -
 
         for error in errors:
             if isinstance(error, ParseError):
-                LOG.error(f"- Parse: path {error.path} > expected [{", ".join(error.expected)}]")
+                LOG.error(
+                    f"- Parse: path {error.path} > expected [{", ".join(error.expected)}]"
+                )
             elif isinstance(error, BuildError):
                 LOG.error(f"- Build: {error.msg}")
             elif isinstance(error, DeployError):
                 LOG.error(f"- Deploy: {error.msg}")
             else:
                 LOG.error(f"- {type(error)}: {error}")
+
 
 def get_exit_status(errors: typing.Sequence[typing.Union[LibError]]) -> bool:
     if not errors:

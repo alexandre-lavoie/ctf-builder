@@ -14,54 +14,68 @@ from ..schema import Deployer, DeployerDocker, PortProtocol
 from .args import BuildArgs
 from .utils import subclass_get
 
+
 def default_port_generator() -> typing.Generator[typing.Optional[str], None, None]:
     while True:
         yield None
+
 
 @dataclasses.dataclass
 class DeployContext:
     name: str
     path: str
-    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(default=None)
+    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
+        default=None
+    )
     network: typing.Optional[str] = dataclasses.field(default=None)
     host: typing.Optional[str] = dataclasses.field(default=None)
-    port_generator: typing.Generator[typing.Optional[str], None, None] = dataclasses.field(default_factory=lambda: default_port_generator())
+    port_generator: typing.Generator[typing.Optional[str], None, None] = (
+        dataclasses.field(default_factory=lambda: default_port_generator())
+    )
+
 
 class BuildDeployer(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def __type__(cls) -> typing.Type[Deployer]:
         return None
-    
+
     @classmethod
     def get(cls, obj: Deployer) -> typing.Type["BuildDeployer"]:
         return subclass_get(cls, obj)
-    
+
     @classmethod
     @abc.abstractmethod
     def has_host(cls, deployer: DeployerDocker) -> bool:
         return False
-    
+
     @classmethod
     @abc.abstractmethod
-    def public_ports(cls, deployer: DeployerDocker, port: int) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
+    def public_ports(
+        cls, deployer: DeployerDocker, port: int
+    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
         return []
 
     @classmethod
     @abc.abstractmethod
-    def start(cls, context: DeployContext, deployer: Deployer) -> typing.Sequence[LibError]:
+    def start(
+        cls, context: DeployContext, deployer: Deployer
+    ) -> typing.Sequence[LibError]:
         return []
-    
+
     @classmethod
     @abc.abstractmethod
-    def stop(cls, context: DeployContext, deployer: Deployer) -> typing.Sequence[LibError]:
+    def stop(
+        cls, context: DeployContext, deployer: Deployer
+    ) -> typing.Sequence[LibError]:
         return []
+
 
 class BuildDeployerDocker(BuildDeployer):
     @classmethod
     def __type__(cls) -> typing.Type[Deployer]:
         return DeployerDocker
-    
+
     @classmethod
     def get_name(cls, context: DeployContext) -> str:
         return cls.to_docker_tag(context.name)
@@ -69,13 +83,15 @@ class BuildDeployerDocker(BuildDeployer):
     @classmethod
     def to_docker_tag(cls, text: str) -> str:
         return text.replace(" ", "_").lower()
-    
+
     @classmethod
     def has_host(cls, deployer: DeployerDocker) -> bool:
         return any(port.public for port in deployer.ports)
 
     @classmethod
-    def public_ports(cls, deployer: DeployerDocker, port: int) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
+    def public_ports(
+        cls, deployer: DeployerDocker, port: int
+    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
         out = []
         for p in deployer.ports:
             if p.public:
@@ -89,7 +105,9 @@ class BuildDeployerDocker(BuildDeployer):
         return out
 
     @classmethod
-    def start(cls, context: DeployContext, deployer: DeployerDocker) -> typing.Sequence[LibError]:
+    def start(
+        cls, context: DeployContext, deployer: DeployerDocker
+    ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [DeployError("No docker client")]
 
@@ -102,13 +120,13 @@ class BuildDeployerDocker(BuildDeployer):
             return [DeployError("Dockerfile is invalid")]
 
         dockerfile = os.path.abspath(dockerfile)
-        
+
         errors = []
         build_args = {}
         for args in deployer.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
                 errors.append("invalid")
-                break 
+                break
 
             for key, value in arg_map.items():
                 build_args[key] = value
@@ -117,7 +135,7 @@ class BuildDeployerDocker(BuildDeployer):
         for env in deployer.env:
             if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
                 errors.append("invalid")
-                break 
+                break
 
             for key, value in arg_map.items():
                 environment[key] = value
@@ -126,7 +144,7 @@ class BuildDeployerDocker(BuildDeployer):
             image, logs = context.docker_client.images.build(
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
-                buildargs=build_args
+                buildargs=build_args,
             )
 
             for log in logs:
@@ -164,7 +182,7 @@ class BuildDeployerDocker(BuildDeployer):
                     context.network: context.docker_client.api.create_endpoint_config(
                         aliases=aliases
                     )
-                }
+                },
             )
 
             return []
@@ -179,7 +197,9 @@ class BuildDeployerDocker(BuildDeployer):
         return errors
 
     @classmethod
-    def stop(cls, context: DeployContext, deployer: Deployer) -> typing.Sequence[LibError]:
+    def stop(
+        cls, context: DeployContext, deployer: Deployer
+    ) -> typing.Sequence[LibError]:
         name = cls.to_docker_tag(context.name)
 
         try:

@@ -2,6 +2,7 @@ import typing
 
 from ..schema import FileMap
 
+
 class BuildFileMap:
     @classmethod
     def build(cls, file_map: FileMap) -> typing.Optional[typing.Tuple[str, str]]:

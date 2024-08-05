@@ -3,9 +3,11 @@ import sys
 
 LOG = logging.getLogger("ctf_builder")
 
+
 class InfoFilter(logging.Filter):
     def filter(self, rec):
         return rec.levelno in (logging.DEBUG, logging.INFO)
+
 
 def setup_logging(logger: logging.Logger, verbose: bool) -> None:
     logger.setLevel(logging.DEBUG if verbose else logging.WARN)

@@ -3,26 +3,32 @@ import enum
 from .error import ParseError
 from .schema import *
 
-TT = typing.TypeVar("TT")
-def __get_subclass_from_name(target: typing.Type[TT], name: str) -> typing.Optional[typing.Type[TT]]:
-    self_name = target.__name__ 
+SUBCLASS = typing.TypeVar("SUBCLASS")
+PTYPE = typing.TypeVar("PTYPE")
+ATOM_TYPES = (str, int, float, bool)
+
+
+def __get_subclass_from_name(
+    target: typing.Type[SUBCLASS], name: str
+) -> typing.Optional[typing.Type[SUBCLASS]]:
+    self_name = target.__name__
 
     for subclass in target.__subclasses__():
-        if subclass.__name__[len(self_name):].lower() == name:
+        if subclass.__name__[len(self_name) :].lower() == name:
             return subclass
 
     return None
 
+
 def __get_subclass_names(target: typing.Type) -> typing.List[str]:
-    self_name = target.__name__ 
+    self_name = target.__name__
 
     names = []
     for subclass in target.__subclasses__():
-        names.append(subclass.__name__[len(self_name):].lower())
+        names.append(subclass.__name__[len(self_name) :].lower())
 
     return names
 
-ATOM_TYPES = (str, int, float, bool)
 
 def __expected(ptype: typing.Type) -> str:
     if ptype in ATOM_TYPES:
@@ -36,8 +42,10 @@ def __expected(ptype: typing.Type) -> str:
     else:
         return ["dict"]
 
-PT = typing.TypeVar("PT")
-def __parse_type(ptype: typing.Type[PT], data: typing.Any, key_path: str = "") -> typing.Tuple[typing.Optional[PT], typing.Sequence[ParseError]]:
+
+def __parse_type(
+    ptype: typing.Type[PTYPE], data: typing.Any, key_path: str = ""
+) -> typing.Tuple[typing.Optional[PTYPE], typing.Sequence[ParseError]]:
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)
 
@@ -52,7 +60,7 @@ def __parse_type(ptype: typing.Type[PT], data: typing.Any, key_path: str = "") -
 
         if not isinstance(data, dict):
             return None, [ParseError(key_path, __expected(ptype))]
-        
+
         output = {}
         errors = []
         for k, v in data.items():
@@ -106,7 +114,9 @@ def __parse_type(ptype: typing.Type[PT], data: typing.Any, key_path: str = "") -
             parent = ptype
             ptype = __get_subclass_from_name(ptype, tname)
             if ptype is None:
-                return None, [ParseError(f"{key_path}.$type", __get_subclass_names(parent))]
+                return None, [
+                    ParseError(f"{key_path}.$type", __get_subclass_names(parent))
+                ]
 
         fields = {}
         errors = []
@@ -118,7 +128,9 @@ def __parse_type(ptype: typing.Type[PT], data: typing.Any, key_path: str = "") -
                 elif not isinstance(field.default_factory, dataclasses._MISSING_TYPE):
                     d, err = field.default_factory(), []
                 else:
-                    d, err = None, [ParseError(f"{key_path}.{field.name}", __expected(field.type))]
+                    d, err = None, [
+                        ParseError(f"{key_path}.{field.name}", __expected(field.type))
+                    ]
             else:
                 d, err = __parse_type(field.type, value, f"{key_path}.{field.name}")
 
@@ -132,7 +144,10 @@ def __parse_type(ptype: typing.Type[PT], data: typing.Any, key_path: str = "") -
 
         return ptype(**fields), []
 
-def parse_track(data: typing.Dict) -> typing.Tuple[typing.Optional[Track], typing.Sequence[ParseError]]:
+
+def parse_track(
+    data: typing.Dict,
+) -> typing.Tuple[typing.Optional[Track], typing.Sequence[ParseError]]:
     if data is None:
         return None, [ParseError("", __expected(Track))]
 

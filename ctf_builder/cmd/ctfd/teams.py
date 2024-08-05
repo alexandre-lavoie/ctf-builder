@@ -7,6 +7,7 @@ import uuid
 
 import requests
 
+
 @dataclasses.dataclass
 class User:
     name: str
@@ -45,6 +46,7 @@ class User:
             out[field.name] = getattr(self, field.name)
 
         return out
+
 
 @dataclasses.dataclass
 class Team:
@@ -89,21 +91,19 @@ class Team:
 
         return out
 
+
 def make_teams(file: str) -> typing.List[Team]:
     with open(file, "r") as h:
         data = json.load(h)
 
-    return [
-        Team.from_dict(team)
-        for team in data["teams"]
-    ]
+    return [Team.from_dict(team) for team in data["teams"]]
+
 
 def build_user(url: str, api_key: str, user: User) -> bool:
-    res = requests.post(f"{url}/api/v1/users", 
-        headers={
-            "Authorization": f"Token {api_key}"
-        },
-        json=user.to_api()
+    res = requests.post(
+        f"{url}/api/v1/users",
+        headers={"Authorization": f"Token {api_key}"},
+        json=user.to_api(),
     )
 
     if res.status_code != 200:
@@ -114,24 +114,22 @@ def build_user(url: str, api_key: str, user: User) -> bool:
 
     return True
 
+
 def add_user_to_team(url: str, api_key: str, team_id: int, user_id: int) -> bool:
-    res = requests.post(f"{url}/api/v1/teams/{team_id}/members", 
-        headers={
-            "Authorization": f"Token {api_key}"
-        }, 
-        json={
-            "user_id": user_id
-        }
+    res = requests.post(
+        f"{url}/api/v1/teams/{team_id}/members",
+        headers={"Authorization": f"Token {api_key}"},
+        json={"user_id": user_id},
     )
 
     return res.status_code == 200
 
+
 def build_team(url: str, api_key: str, team: Team) -> bool:
-    res = requests.post(f"{url}/api/v1/teams", 
-        headers={
-            "Authorization": f"Token {api_key}"
-        }, 
-        json=team.to_api()
+    res = requests.post(
+        f"{url}/api/v1/teams",
+        headers={"Authorization": f"Token {api_key}"},
+        json=team.to_api(),
     )
 
     if res.status_code == 200:
@@ -148,11 +146,25 @@ def build_team(url: str, api_key: str, team: Team) -> bool:
 
     return True
 
+
 def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     parser.add_argument("-k", "--api_key", help="API Key", required=True)
-    parser.add_argument("-u", "--url", help="URL for CTFd", default="http://localhost:8000")
-    parser.add_argument("-f", "--file", help="Config file path", default=os.path.join(root_directory, "ctfd", "teams.json"))
-    parser.add_argument("-o", "--output", help="Output file", default=os.path.join(root_directory, "ctfd", "teams.out.json"))
+    parser.add_argument(
+        "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        help="Config file path",
+        default=os.path.join(root_directory, "ctfd", "teams.json"),
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output file",
+        default=os.path.join(root_directory, "ctfd", "teams.out.json"),
+    )
+
 
 def cli(args, root_directory: str) -> bool:
     teams = make_teams(args.file)
