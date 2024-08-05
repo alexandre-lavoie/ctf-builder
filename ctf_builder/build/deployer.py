@@ -215,6 +215,19 @@ class BuildDeployerDocker(BuildDeployer):
                         aliases=aliases
                     )
                 },
+                healthcheck=(
+                    {
+                        "test": deployer.healthcheck.test,
+                        "interval": int(deployer.healthcheck.interval * 1_000_000_000),
+                        "timeout": int(deployer.healthcheck.timeout * 1_000_000_000),
+                        "retries": deployer.healthcheck.retries,
+                        "start_period": int(
+                            deployer.healthcheck.start_period * 1_000_000_000
+                        ),
+                    }
+                    if deployer.healthcheck
+                    else None
+                ),
             )
 
             return []

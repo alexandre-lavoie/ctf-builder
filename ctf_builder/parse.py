@@ -89,6 +89,11 @@ def __parse_type(
                 output.append(d)
 
         return output, errors
+    elif ptype == float:
+        if not isinstance(data, (ptype, int)):
+            return None, [ParseError(key_path, __expected(ptype))]
+
+        return float(data), []
     elif ptype in ATOM_TYPES:
         if not isinstance(data, ptype):
             return None, [ParseError(key_path, __expected(ptype))]

@@ -7,7 +7,7 @@ import typing
 
 from ..schema import Track, Path
 
-ATOM_TYPES = {str: "string", int: "integer", float: "float", bool: "boolean"}
+ATOM_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
 
 def is_optional(ptype: typing.Type):

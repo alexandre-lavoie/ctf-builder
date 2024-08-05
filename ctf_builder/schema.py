@@ -217,6 +217,28 @@ class AttachmentDirectory(Attachment):
 
 
 @dataclasses.dataclass(frozen=True)
+class Healthcheck:
+    """
+    Script to check health of resource.
+    """
+
+    test: str = dataclasses.field(metadata=_meta_comment("Command to in an OS shell"))
+    interval: float = dataclasses.field(
+        default=1, metadata=_meta_comment("Time between checks in seconds")
+    )
+    timeout: float = dataclasses.field(
+        default=1, metadata=_meta_comment("Time to wait to consider hung in seconds")
+    )
+    retries: int = dataclasses.field(
+        default=3,
+        metadata=_meta_comment("Number of consecutive failures to consider unhealthy"),
+    )
+    start_period: float = dataclasses.field(
+        default=0, metadata=_meta_comment("Time to wait to start checking in seconds")
+    )
+
+
+@dataclasses.dataclass(frozen=True)
 class Builder(abc.ABC):
     """
     Automation to build challenges.
@@ -269,6 +291,9 @@ class DeployerDocker(Deployer):
     )
     ports: typing.List[Port] = dataclasses.field(
         default_factory=list, metadata=_meta_comment("Ports for deployment")
+    )
+    healthcheck: typing.Optional[Healthcheck] = dataclasses.field(
+        default=None, metadata=_meta_comment("Healtcheck for Dockerfile")
     )
 
 
