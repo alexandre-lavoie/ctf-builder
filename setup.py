@@ -12,7 +12,7 @@ package_name = "ctf_builder"
 
 setuptools.setup(
     name=package_name,
-    version="0.0.0",
+    version="0.0.1",
     author="Alexandre Lavoie",
     author_email="alexandre.lavoie00@gmail.com",
     description="Tool for building CTFs",
