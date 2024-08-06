@@ -15,6 +15,11 @@ from .common import cli_challenge_wrapper, WrapContext, CliContext
 
 
 @dataclasses.dataclass(frozen=True)
+class Args:
+    challenge: typing.List[str]
+
+
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     docker_client: typing.Optional[docker.DockerClient]
 
@@ -23,7 +28,7 @@ def build(track: Track, context: Context) -> typing.Sequence[LibError]:
     if not track.build:
         return [SkipError()]
 
-    errors = []
+    errors: typing.List[LibError] = []
     for builder in track.build:
         errors += BuildBuilder.get(builder).build(
             builder=builder,
@@ -35,7 +40,7 @@ def build(track: Track, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
@@ -50,12 +55,12 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
         error_prefix=[],
         skip_inactive=False,
-        docker_client=docker.from_env(),
+        docker_client=cli_context.docker_client,
     )
 
     return cli_challenge_wrapper(

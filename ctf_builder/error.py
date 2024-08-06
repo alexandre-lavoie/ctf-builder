@@ -60,8 +60,6 @@ def print_errors(
     else:
         safe_console = console
 
-    header_segments = []
-
     if prefix:
         prefix_text = rich.markup.render(
             "[blue]:[/]".join(rich.markup.escape(section) for section in prefix)
@@ -93,13 +91,15 @@ def print_errors(
     else:
         time_text = None
 
-    header_segments = [prefix_text, time_text, status_text]
+    header = rich.columns.Columns(
+        [v for v in [prefix_text, time_text, status_text] if v]
+    )
 
     if is_ok:
-        safe_console.print(*[s for s in header_segments if s])
+        safe_console.print(header)
         return
 
-    error_tree = rich.tree.Tree(rich.columns.Columns(header_segments))
+    error_tree = rich.tree.Tree(header)
 
     parse_tree = rich.tree.Tree("[red]challenge.json[/]")
     build_tree = rich.tree.Tree("[red]Build[/]")
@@ -115,20 +115,26 @@ def print_errors(
         elif isinstance(error, (BuildError, DeployError)):
             if isinstance(error, DeployError):
                 target_tree = deploy_tree
-            else:
+                error_context = error.context
+                error_msg = error.msg
+                error_error = error.error
+            elif isinstance(error, BuildError):
                 target_tree = build_tree
+                error_context = error.context
+                error_msg = error.msg
+                error_error = error.error
 
-            error_segments = [
+            error_segments: typing.List[rich.console.RenderableType] = [
                 rich.markup.render(
-                    f"[red]{error.context}[/] {rich.markup.escape(error.msg)}"
+                    f"[red]{error_context}[/] {rich.markup.escape(error_msg)}"
                 )
             ]
 
-            if error.error:
+            if error_error:
                 error_segments.append(
                     rich.panel.Panel(
                         rich.markup.render(
-                            f"[red]{rich.markup.escape(str(error.error))}[/]"
+                            f"[red]{rich.markup.escape(str(error_error))}[/]"
                         ),
                         title="error",
                         style="red",
@@ -137,6 +143,7 @@ def print_errors(
 
             target_tree.add(rich.console.Group(*error_segments))
         elif isinstance(error, TestError):
+            label: rich.console.RenderableType
             if error.error:
                 label = rich.console.Group(
                     rich.markup.render(

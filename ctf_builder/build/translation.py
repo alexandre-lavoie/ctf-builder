@@ -6,12 +6,10 @@ from ..schema import Translation, TranslationEnglish, TranslationFrench
 from .utils import subclass_get
 
 
-class BuildTranslation(abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Translation]:
-        return None
+T = typing.TypeVar("T", bound=Translation)
 
+
+class BuildTranslation(typing.Generic[T], abc.ABC):
     @classmethod
     def get(cls, obj: Translation) -> typing.Type["BuildTranslation"]:
         return subclass_get(cls, obj)
@@ -19,46 +17,38 @@ class BuildTranslation(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def priority(cls) -> int:
-        return 0
+        pass
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, root: str, translation: Translation) -> typing.Optional[str]:
-        return []
+    def build(cls, root: str, translation: T) -> typing.Optional[str]:
+        pass
 
     @classmethod
     def build_common(cls, root: str, translation: Translation) -> typing.Optional[str]:
         path = translation.path.resolve(root)
         if path is None:
-            return False
+            return None
 
         with open(path) as h:
             return h.read().strip()
 
 
-class BuildTranslationFrench(BuildTranslation):
-    @classmethod
-    def __type__(cls) -> typing.Type[Translation]:
-        return TranslationFrench
-
+class BuildTranslationFrench(BuildTranslation[TranslationFrench]):
     @classmethod
     def priority(cls) -> int:
         return 1
 
     @classmethod
-    def build(cls, root: str, description: TranslationFrench) -> typing.Optional[str]:
-        return cls.build_common(root, description)
+    def build(cls, root: str, translation: TranslationFrench) -> typing.Optional[str]:
+        return cls.build_common(root, translation)
 
 
-class BuildTranslationEnglish(BuildTranslation):
-    @classmethod
-    def __type__(cls) -> typing.Type[Translation]:
-        return TranslationEnglish
-
+class BuildTranslationEnglish(BuildTranslation[TranslationEnglish]):
     @classmethod
     def priority(cls) -> int:
         return 2
 
     @classmethod
-    def build(cls, root: str, description: TranslationEnglish) -> typing.Optional[str]:
-        return cls.build_common(root, description)
+    def build(cls, root: str, translation: TranslationEnglish) -> typing.Optional[str]:
+        return cls.build_common(root, translation)

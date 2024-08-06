@@ -41,7 +41,7 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    errors = []
+    errors: typing.List[LibError] = []
     for i, deployer in enumerate(track.deploy):
         errors += BuildDeployer.get(deployer).start(
             deployer=deployer,
@@ -87,8 +87,6 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 
 
 def cli(args, cli_context: CliContext) -> bool:
-    docker_client = docker.from_env()
-
     arg_hosts = args.ip if args.ip else ["0.0.0.0"]
     arg_networks = args.network if args.network else [DEPLOY_NETWORK]
 
@@ -102,7 +100,7 @@ def cli(args, cli_context: CliContext) -> bool:
 
     is_ok = True
     for arg_host, arg_network in zip(arg_hosts, arg_networks):
-        network = get_create_network(docker_client, arg_network)
+        network = get_create_network(cli_context.docker_client, arg_network)
         if network is None:
             print_errors(
                 prefix=[arg_network],
@@ -116,7 +114,7 @@ def cli(args, cli_context: CliContext) -> bool:
             error_prefix=[network.name] if len(arg_networks) > 1 else [],
             skip_inactive=False,
             network=network,
-            docker_client=docker_client,
+            docker_client=cli_context.docker_client,
             host=arg_host,
             port=args.port,
         )

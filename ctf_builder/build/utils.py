@@ -1,12 +1,18 @@
 import typing
 
 T = typing.TypeVar("T")
-U = typing.TypeVar("U")
 
 
-def subclass_get(cls: typing.Type[T], obj: U) -> typing.Type[T]:
+def subclass_get(cls: typing.Type[T], obj: typing.Any) -> typing.Type[T]:
     for subclass in cls.__subclasses__():
-        if subclass.__type__() == type(obj):
+        orig_bases = getattr(subclass, "__orig_bases__", None)
+        assert orig_bases
+
+        parent_type_generic = orig_bases[0]
+        parent_type_args = typing.get_args(parent_type_generic)
+        assert parent_type_args
+
+        if isinstance(obj, parent_type_args[0]):
             return subclass
 
     assert False, f"unhandled {type(obj)}"

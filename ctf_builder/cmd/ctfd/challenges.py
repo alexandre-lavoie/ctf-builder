@@ -96,7 +96,7 @@ def build_create_challenges(
                 )
                 continue
 
-            deploy_ports = deploy_ports[challenge.host.index]
+            deploy_ports = deploy_ports_list[challenge.host.index]
             if not deploy_ports:
                 errors.append(
                     BuildError(
@@ -165,14 +165,14 @@ class FlagCreateRequest:
     challenge: int
     content: str
     type: str
-    data: str = dataclasses.field(default=None)
+    data: typing.Optional[str] = dataclasses.field(default=None)
 
 
 def build_create_flags(
     track: Track, ids: typing.List[int], context: Context
 ) -> typing.Tuple[typing.List[FlagCreateRequest], typing.Sequence[LibError]]:
     output = []
-    errors = []
+    errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
         for flag in challenge.flags:
@@ -217,7 +217,7 @@ def post_create_flags(
 def post_attachments(
     track: Track, ids: typing.List[int], context: Context
 ) -> typing.Sequence[LibError]:
-    errors = []
+    errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
         for i, attachment in enumerate(challenge.attachments):
@@ -258,7 +258,7 @@ def post_attachments(
 def post_hints(
     track: Track, ids: typing.List[int], context: Context
 ) -> typing.Sequence[LibError]:
-    errors = []
+    errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
         for i, hint in enumerate(challenge.hints):
@@ -293,14 +293,17 @@ def post_hints(
 def patch_references(
     track: Track, ids: typing.List[int], context: Context
 ) -> typing.Sequence[LibError]:
-    errors = []
+    errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
         prerequisites = []
         for offset in challenge.prerequisites:
             if offset >= len(ids):
                 errors.append(
-                    f"offset {offset} for prerequisites is out of range for challenge {id}"
+                    BuildError(
+                        context=f"Challenge {id}",
+                        msg="offset for prerequisites is out of range",
+                    )
                 )
                 continue
 
@@ -363,7 +366,7 @@ def deploy_challenge(track: Track, context: Context) -> typing.Sequence[LibError
     if errors:
         return errors
 
-    all_errors = []
+    all_errors: typing.List[LibError] = []
 
     flag_requests, errors = build_create_flags(track, challenge_ids, context)
     all_errors += errors

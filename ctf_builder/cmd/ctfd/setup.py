@@ -1,6 +1,5 @@
 import argparse
 import dataclasses
-import io
 import os.path
 import json
 import re
@@ -13,16 +12,22 @@ from ..common import CliContext
 
 @dataclasses.dataclass
 class SetupFiles:
-    ctf_logo: io.BytesIO = dataclasses.field(default=None)
-    ctf_banner: io.BytesIO = dataclasses.field(default=None)
-    ctf_small_icon: io.BytesIO = dataclasses.field(default=None)
+    ctf_logo: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
+    ctf_banner: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
+    ctf_small_icon: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
 
     @classmethod
-    def from_dict(cls, directory: str, data: typing.Dict) -> "SetupFiles":
-        fields = {}
+    def from_dict(
+        cls, directory: str, data: typing.Dict[str, typing.Any]
+    ) -> "SetupFiles":
+        fields: typing.Dict[str, typing.BinaryIO] = {}
 
         for field in dataclasses.fields(cls):
-            path = os.path.join(directory, data.get(field.name))
+            field_value = data.get(field.name)
+            if not isinstance(field_value, str):
+                continue
+
+            path = os.path.join(directory, field_value)
 
             if not (os.path.exists(path) and os.path.isfile(path)):
                 continue
@@ -31,7 +36,7 @@ class SetupFiles:
 
         return cls(**fields)
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(SetupFiles):
@@ -54,14 +59,14 @@ class SetupData:
     email: str
     password: str
     ctf_theme: str = dataclasses.field(default="core-beta")
-    theme_color: str = dataclasses.field(default=None)
-    start: str = dataclasses.field(default=None)
-    end: str = dataclasses.field(default=None)
-    nonce: str = dataclasses.field(default=None)
+    theme_color: typing.Optional[str] = dataclasses.field(default=None)
+    start: typing.Optional[str] = dataclasses.field(default=None)
+    end: typing.Optional[str] = dataclasses.field(default=None)
+    nonce: typing.Optional[str] = dataclasses.field(default=None)
     team_size: int = dataclasses.field(default=0)
 
     @classmethod
-    def from_dict(cls, data: typing.Dict) -> "SetupData":
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "SetupData":
         fields = {}
 
         for field in dataclasses.fields(cls):
@@ -73,7 +78,7 @@ class SetupData:
 
         return cls(**fields)
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(SetupData):
@@ -88,12 +93,12 @@ class Setup:
     files: SetupFiles
 
     @classmethod
-    def from_dict(cls, directory: str, data: typing.Dict) -> "Setup":
+    def from_dict(cls, directory: str, data: typing.Dict[str, typing.Any]) -> "Setup":
         return Setup(
             data=SetupData.from_dict(data), files=SetupFiles.from_dict(directory, data)
         )
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         return {"data": self.data.to_dict(), "files": self.files.to_dict()}
 
 

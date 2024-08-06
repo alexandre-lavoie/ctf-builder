@@ -15,6 +15,8 @@ from .args import BuildArgs
 from .file_map import BuildFileMap
 from .utils import subclass_get
 
+T = typing.TypeVar("T", bound=Builder)
+
 
 @dataclasses.dataclass
 class BuildContext:
@@ -24,29 +26,18 @@ class BuildContext:
     )
 
 
-class BuildBuilder(abc.ABC):
+class BuildBuilder(typing.Generic[T], abc.ABC):
     @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Builder]:
-        return None
-
-    @classmethod
-    def get(cls, obj: Builder) -> typing.Type["BuildBuilder"]:
+    def get(cls, obj: T) -> typing.Type["BuildBuilder"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
-    def build(
-        cls, context: BuildContext, builder: Builder
-    ) -> typing.Sequence[LibError]:
-        return []
+    def build(cls, context: BuildContext, builder: T) -> typing.Sequence[LibError]:
+        pass
 
 
-class BuildBuilderDocker(BuildBuilder):
-    @classmethod
-    def __type__(cls) -> typing.Type[Builder]:
-        return BuilderDocker
-
+class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
     @classmethod
     def build(
         cls, context: BuildContext, builder: BuilderDocker
@@ -54,6 +45,7 @@ class BuildBuilderDocker(BuildBuilder):
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="no client initialized")]
 
+        dockerfile: typing.Optional[str]
         if builder.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
@@ -95,7 +87,7 @@ class BuildBuilderDocker(BuildBuilder):
             ]
 
         try:
-            for i, file_map in enumerate(builder.files):
+            for file_map in builder.files:
                 source, destination = BuildFileMap.build(file_map)
                 destination = os.path.join(os.path.abspath(context.path), destination)
 
@@ -128,8 +120,15 @@ class BuildBuilderDocker(BuildBuilder):
                         )
                         continue
 
+                    extract_file = th.extractfile(members[0])
+                    if extract_file is None:
+                        errors.append(
+                            BuildError(context=source, msg="file cannot be extracted")
+                        )
+                        continue
+
                     with open(destination, "wb") as dh:
-                        dh.write(th.extractfile(members[0]).read())
+                        dh.write(extract_file.read())
         finally:
             try:
                 container.remove(force=True)

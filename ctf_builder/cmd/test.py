@@ -29,7 +29,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     else:
         network = None
 
-    errors = []
+    errors: typing.List[LibError] = []
     running_deployers = []
     try:
         if network:
@@ -117,7 +117,7 @@ def cli(args, cli_context: CliContext) -> bool:
         challenge_path="",
         error_prefix=[],
         skip_inactive=False,
-        docker_client=docker.from_env(),
+        docker_client=cli_context.docker_client,
     )
 
     return cli_challenge_wrapper(

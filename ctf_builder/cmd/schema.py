@@ -25,6 +25,7 @@ def document_type(
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)
 
+    out: typing.Dict[str, typing.Any]
     if is_optional(ptype):
         return document_type(args[0], description)
     elif origin == dict:

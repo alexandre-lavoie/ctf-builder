@@ -28,9 +28,13 @@ class WrapContext:
     skip_inactive: bool
 
 
+WC = typing.TypeVar("WC", bound=WrapContext)
+
+
 @dataclasses.dataclass(frozen=True)
 class CliContext:
     root_directory: str
+    docker_client: docker.DockerClient
     console: typing.Optional[rich.console.Console]
 
 
@@ -142,7 +146,7 @@ def cli_challenge(
         return False
 
     track, parse_errors = parse_track(raw_track)
-    if parse_errors:
+    if track is None or parse_errors:
         errors += parse_errors
         return False
 
@@ -157,9 +161,9 @@ def cli_challenge(
 
 def cli_challenge_wrapper(
     root_directory: str,
-    challenges: typing.Sequence[str],
-    context: WrapContext,
-    callback: typing.Callable[[Track, WrapContext], typing.Sequence[LibError]],
+    challenges: typing.Optional[typing.Sequence[str]],
+    context: WC,
+    callback: typing.Callable[[Track, WC], typing.Sequence[LibError]],
     console: typing.Optional[rich.console.Console] = None,
 ) -> bool:
     if not challenges:
@@ -170,7 +174,7 @@ def cli_challenge_wrapper(
     error_map: typing.Dict[str, typing.List[LibError]] = {}
     threads: typing.List[typing.Tuple[threading.Thread, str]] = []
     for challenge in challenges:
-        errors = []
+        errors: typing.List[LibError] = []
         error_map[challenge] = errors
 
         challenge_path = os.path.join(root_directory, "challenges", challenge)

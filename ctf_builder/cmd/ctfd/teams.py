@@ -14,7 +14,7 @@ from ..common import CliContext
 class User:
     name: str
     email: str
-    id: int = dataclasses.field(default=None)
+    id: int = dataclasses.field(default=-1)
     password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     banned: bool = dataclasses.field(default=False)
     hidden: bool = dataclasses.field(default=False)
@@ -54,7 +54,7 @@ class User:
 class Team:
     name: str
     email: str
-    id: int = dataclasses.field(default=None)
+    id: int = dataclasses.field(default=-1)
     password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     banned: bool = dataclasses.field(default=False)
     hidden: bool = dataclasses.field(default=False)

@@ -17,6 +17,9 @@ from .flag import BuildFlag
 from .utils import subclass_get
 
 
+T = typing.TypeVar("T", bound=Tester)
+
+
 @dataclasses.dataclass
 class TestContext:
     path: str
@@ -28,27 +31,22 @@ class TestContext:
     )
 
 
-class BuildTester(abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Tester]:
-        return None
-
+class BuildTester(typing.Generic[T], abc.ABC):
     @classmethod
     def get(cls, obj: Tester) -> typing.Type["BuildTester"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, context: TestContext, tester: Tester) -> typing.Sequence[LibError]:
-        return []
+    def build(cls, context: TestContext, tester: T) -> typing.Sequence[LibError]:
+        pass
 
 
 @dataclasses.dataclass(frozen=True)
 class DockerTestContext:
     docker_client: docker.DockerClient
     image: str
-    network: str
+    network: typing.Optional[str]
     environment: typing.Mapping[str, str]
     challenge_id: int
     challenge_host: typing.Optional[str]
@@ -100,11 +98,7 @@ def docker_test(context: DockerTestContext):
         context.errors.append(error)
 
 
-class BuildTesterDocker(BuildTester):
-    @classmethod
-    def __type__(cls) -> typing.Type[Tester]:
-        return TesterDocker
-
+class BuildTesterDocker(BuildTester[TesterDocker]):
     @classmethod
     def build(
         cls, context: TestContext, tester: TesterDocker
@@ -112,6 +106,7 @@ class BuildTesterDocker(BuildTester):
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="no client initialized")]
 
+        dockerfile: typing.Optional[str]
         if tester.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
@@ -122,7 +117,7 @@ class BuildTesterDocker(BuildTester):
 
         dockerfile = os.path.abspath(dockerfile)
 
-        errors = []
+        errors: typing.List[LibError] = []
 
         build_args = {}
         for args in tester.args:

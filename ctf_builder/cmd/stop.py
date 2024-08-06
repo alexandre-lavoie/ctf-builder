@@ -27,7 +27,7 @@ def stop(track: Track, context: Context) -> typing.Sequence[LibError]:
     if not track.deploy:
         return [SkipError()]
 
-    errors = []
+    errors: typing.List[LibError] = []
     for i, deployer in enumerate(track.deploy):
         errors += BuildDeployer.get(deployer).stop(
             deployer=deployer,
@@ -61,12 +61,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 
 
 def cli(args, cli_context: CliContext) -> bool:
-    docker_client = docker.from_env()
-
     is_ok = True
     arg_networks = args.network if args.network else [DEPLOY_NETWORK]
     for arg_network in arg_networks:
-        network = get_network(docker_client, arg_network)
+        network = get_network(cli_context.docker_client, arg_network)
         if network is None:
             print_errors(
                 prefix=[arg_network],
@@ -80,7 +78,7 @@ def cli(args, cli_context: CliContext) -> bool:
             error_prefix=[network.name] if len(arg_networks) > 1 else [],
             skip_inactive=False,
             network=network,
-            docker_client=docker_client,
+            docker_client=cli_context.docker_client,
         )
 
         if not cli_challenge_wrapper(
