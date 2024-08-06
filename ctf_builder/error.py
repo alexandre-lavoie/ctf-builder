@@ -53,7 +53,7 @@ def print_errors(
     errors: typing.Sequence[typing.Union[LibError]],
     prefix: typing.Optional[typing.List[str]] = None,
     console: typing.Optional[rich.console.Console] = None,
-    elapsed_time: typing.Optional[float] = None
+    elapsed_time: typing.Optional[float] = None,
 ) -> None:
     if not console:
         safe_console = rich.console.Console()
@@ -63,9 +63,9 @@ def print_errors(
     header_segments = []
 
     if prefix:
-        prefix_text = rich.markup.render("[blue]:[/]".join(
-            rich.markup.escape(section) for section in prefix
-        ))
+        prefix_text = rich.markup.render(
+            "[blue]:[/]".join(rich.markup.escape(section) for section in prefix)
+        )
     else:
         prefix_text = None
 
@@ -86,7 +86,10 @@ def print_errors(
     status_text = rich.markup.render(status)
 
     if not is_skip and elapsed_time is not None:
-        time_text = rich.text.Text(str(datetime.timedelta(seconds=max(0, int(elapsed_time)))), style=status_color)
+        time_text = rich.text.Text(
+            str(datetime.timedelta(seconds=max(0, int(elapsed_time)))),
+            style=status_color,
+        )
     else:
         time_text = None
 
@@ -116,15 +119,19 @@ def print_errors(
                 target_tree = build_tree
 
             error_segments = [
-                rich.markup.render(f"[red]{error.context}[/] {rich.markup.escape(error.msg)}")
+                rich.markup.render(
+                    f"[red]{error.context}[/] {rich.markup.escape(error.msg)}"
+                )
             ]
 
             if error.error:
                 error_segments.append(
                     rich.panel.Panel(
-                        rich.markup.render(f"[red]{rich.markup.escape(str(error.error))}[/]"),
+                        rich.markup.render(
+                            f"[red]{rich.markup.escape(str(error.error))}[/]"
+                        ),
                         title="error",
-                        style="red"
+                        style="red",
                     )
                 )
 
@@ -132,15 +139,21 @@ def print_errors(
         elif isinstance(error, TestError):
             if error.error:
                 label = rich.console.Group(
-                    rich.markup.render(f"[red]{error.context}[/] error for [red]{rich.markup.escape(error.expected)}[/]"),
+                    rich.markup.render(
+                        f"[red]{error.context}[/] error for [red]{rich.markup.escape(error.expected)}[/]"
+                    ),
                     rich.panel.Panel(
-                        rich.markup.render(f"[red]{rich.markup.escape(str(error.error))}[/]"),
+                        rich.markup.render(
+                            f"[red]{rich.markup.escape(str(error.error))}[/]"
+                        ),
                         title="error",
-                        style="red"
-                    )
+                        style="red",
+                    ),
                 )
             else:
-                label = rich.markup.render(f"[red]{error.context}[/] expected [red]{rich.markup.escape(error.expected)}[/] but got [red]{rich.markup.escape(error.actual) if error.actual else '<empty>'}[/]")
+                label = rich.markup.render(
+                    f"[red]{error.context}[/] expected [red]{rich.markup.escape(error.expected)}[/] but got [red]{rich.markup.escape(error.actual) if error.actual else '<empty>'}[/]"
+                )
 
             test_tree.add(label)
         else:

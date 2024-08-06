@@ -90,10 +90,7 @@ class BuildDeployerDocker(BuildDeployer):
     def ports(
         cls, deployer: DeployerDocker
     ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        return [
-            (port.protocol, port.port)
-            for port in deployer.ports
-        ]
+        return [(port.protocol, port.port) for port in deployer.ports]
 
     @classmethod
     def is_healthy(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
@@ -101,7 +98,9 @@ class BuildDeployerDocker(BuildDeployer):
             return False
 
         try:
-            container = context.docker_client.containers.get(cls.get_container_name(context))
+            container = context.docker_client.containers.get(
+                cls.get_container_name(context)
+            )
         except:
             return False
 
@@ -218,7 +217,11 @@ class BuildDeployerDocker(BuildDeployer):
                     errors.append(SkipError())
                 else:
                     errors.append(
-                        DeployError(context=context.name, msg="failed to deploy due to duplicate container", error=e)
+                        DeployError(
+                            context=context.name,
+                            msg="failed to deploy due to duplicate container",
+                            error=e,
+                        )
                     )
             else:
                 errors.append(
@@ -232,14 +235,18 @@ class BuildDeployerDocker(BuildDeployer):
         cls, context: DeployContext, deployer: Deployer, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
         try:
-            container = context.docker_client.containers.get(cls.get_container_name(context))
+            container = context.docker_client.containers.get(
+                cls.get_container_name(context)
+            )
 
             container.remove(force=True)
         except docker.errors.NotFound:
             if skip_not_found:
                 return [SkipError()]
             else:
-                return [DeployError(context=context.name, msg="failed to stop", error=e)]
+                return [
+                    DeployError(context=context.name, msg="failed to stop", error=e)
+                ]
         except docker.errors.APIError as e:
             [DeployError(context=context.name, msg="failed to stop", error=e)]
 

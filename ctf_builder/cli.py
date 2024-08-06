@@ -53,7 +53,9 @@ def cli() -> int:
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--quiet", action="store_true", help="Turn off logging", default=False)
+    parser.add_argument(
+        "--quiet", action="store_true", help="Turn off logging", default=False
+    )
 
     build_menu(parser, CLI, root_directory)
 
@@ -61,10 +63,7 @@ def cli() -> int:
 
     console = rich.console.Console(quiet=args.quiet)
 
-    cli_context = CliContext(
-        root_directory=root_directory,
-        console=console
-    )
+    cli_context = CliContext(root_directory=root_directory, console=console)
 
     path = []
     i = 0

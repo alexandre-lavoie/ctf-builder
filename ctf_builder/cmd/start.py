@@ -19,7 +19,7 @@ from .common import (
     port_generator,
     get_create_network,
     get_challenge_index,
-    CliContext
+    CliContext,
 )
 
 
@@ -96,7 +96,7 @@ def cli(args, cli_context: CliContext) -> bool:
         print_errors(
             prefix=[],
             errors=[DeployError(context="Networks", msg="do not have enough hosts")],
-            console=cli_context.console
+            console=cli_context.console,
         )
         return False
 
@@ -107,7 +107,7 @@ def cli(args, cli_context: CliContext) -> bool:
             print_errors(
                 prefix=[arg_network],
                 errors=[DeployError(context=arg_network, msg="not started")],
-                console=cli_context.console
+                console=cli_context.console,
             )
             continue
 

@@ -20,6 +20,7 @@ from ..schema import Track, PortProtocol
 
 MAX_TCP_PORT = 65_535
 
+
 @dataclasses.dataclass(frozen=True)
 class WrapContext:
     challenge_path: str
@@ -223,7 +224,7 @@ def cli_challenge_wrapper(
                 console=console,
                 prefix=context.error_prefix + [challenge],
                 errors=errors,
-                elapsed_time=challenge_tasks[challenge].elapsed
+                elapsed_time=challenge_tasks[challenge].elapsed,
             )
             progress.remove_task(challenge_tasks[challenge].id)
 

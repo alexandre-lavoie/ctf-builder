@@ -86,7 +86,9 @@ def build_create_challenges(
             continue
 
         if challenge.host is not None:
-            if challenge.host.index < 0 or challenge.host.index >= len(deploy_ports_list):
+            if challenge.host.index < 0 or challenge.host.index >= len(
+                deploy_ports_list
+            ):
                 errors.append(
                     BuildError(
                         context=f"Challenge {i}", msg="has an invalid host index"

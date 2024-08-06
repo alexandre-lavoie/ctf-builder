@@ -28,6 +28,7 @@ from .ctfd.teams import cli_args as ctfd_teams_args
 
 from .common import CliContext
 
+
 @dataclasses.dataclass
 class Command:
     args: typing.Callable[[argparse.ArgumentParser, str], None]

@@ -69,10 +69,8 @@ class BuildBuilderDocker(BuildBuilder):
         for args in builder.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
                 errors.append(
-                    BuildError(
-                        context="Dockerfile",
-                        msg="invalid build args"
-                    ))
+                    BuildError(context="Dockerfile", msg="invalid build args")
+                )
                 break
 
             for key, value in arg_map.items():

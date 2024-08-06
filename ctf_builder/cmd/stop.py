@@ -71,7 +71,7 @@ def cli(args, cli_context: CliContext) -> bool:
             print_errors(
                 prefix=[arg_network],
                 errors=[DeployError(context=arg_network, msg="not found")],
-                console=cli_context.console
+                console=cli_context.console,
             )
             continue
 

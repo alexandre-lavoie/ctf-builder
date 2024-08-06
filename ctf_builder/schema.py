@@ -276,7 +276,9 @@ class DeployerDocker(Deployer):
     Deployment using Docker.
     """
 
-    name: typing.Optional[str] = dataclasses.field(default=None, metadata=_meta_comment("Hostname on network"))
+    name: typing.Optional[str] = dataclasses.field(
+        default=None, metadata=_meta_comment("Hostname on network")
+    )
     path: typing.Optional[PathFile] = dataclasses.field(
         default=None, metadata=_meta_comment("Path to Dockerfile")
     )
@@ -410,7 +412,10 @@ class Track:
 
     name: str = dataclasses.field(metadata=_meta_comment("Name of track/challenge"))
     tag: typing.Optional[str] = dataclasses.field(
-        default=None, metadata=_meta_comment("Simple name to use for labelling, used cleaned up name by default")
+        default=None,
+        metadata=_meta_comment(
+            "Simple name to use for labelling, used cleaned up name by default"
+        ),
     )
     active: typing.Optional[bool] = dataclasses.field(
         default=False, metadata=_meta_comment("Is this track ready to be used?")

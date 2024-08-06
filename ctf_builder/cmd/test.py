@@ -64,10 +64,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
             time.sleep(DEPLOY_SLEEP)
         else:
             errors.append(
-                DeployError(
-                    context="Deployments",
-                    msg="did not start successfully"
-                )
+                DeployError(context="Deployments", msg="did not start successfully")
             )
             return errors
 
