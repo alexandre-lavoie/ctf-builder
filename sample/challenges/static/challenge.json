@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schema.json",
+  "$schema": "../../doc/challenge.json",
   "name": "Static",
   "active": true,
   "challenges": [

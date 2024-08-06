@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schema.json",
+  "$schema": "../../doc/challenge.json",
   "name": "Multiple Deploy",
   "tag": "multi-deploy",
   "active": true,

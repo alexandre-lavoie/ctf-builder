@@ -38,13 +38,22 @@ Note: use the environment variable `CTF=/path/to/ctf` if the command is not bein
 
 Have a look at the [sample](./sample) CTF for the structure of a CTF package.
 
+## 📔 Documentation
+
+```
+ctf doc
+```
+
+Provides the [JSON schema](https://json-schema.org/) for `challenge.json`. This is automatically generated from [schema.py](ctf_builder/schema.py).
+
 ## 🎨 Schema
 
 ```
 ctf schema
 ```
 
-Provides the [JSON schema](https://json-schema.org/) for `challenge.json`. This is automatically generated from [schema.py](ctf_builder/schema.py).
+Validates `challenge.json`. Provides what type is expected and a useful comment for fields.
+
 
 ## 🔨 Build
 

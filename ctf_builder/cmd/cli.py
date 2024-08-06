@@ -3,6 +3,7 @@ import dataclasses
 import typing
 
 from .build import cli as build_cli, cli_args as build_args
+from .documentation import cli as documentation_cli, cli_args as documentation_args
 from .start import cli as start_cli, cli_args as start_args
 from .stop import cli as stop_cli, cli_args as stop_args
 from .schema import cli as schema_cli, cli_args as schema_args
@@ -36,9 +37,14 @@ CLI = Menu(
     help="Main",
     options={
         "build": Command(help="Build static files", args=build_args, cli=build_cli),
+        "doc": Command(
+            help="Build JSON schemas", args=documentation_args, cli=documentation_cli
+        ),
         "start": Command(help="Start challenges", args=start_args, cli=start_cli),
         "stop": Command(help="Stop challenges", args=stop_args, cli=stop_cli),
-        "schema": Command(help="Build JSON schemas", args=schema_args, cli=schema_cli),
+        "schema": Command(
+            help="Validate challenge.json", args=schema_args, cli=schema_cli
+        ),
         "test": Command(help="Test challenges", args=test_args, cli=test_cli),
         "ctfd": Menu(
             help="CTFd integration",

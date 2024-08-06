@@ -111,16 +111,14 @@ def print_errors(
     for error in errors:
         if isinstance(error, ParseError):
             path = rich.markup.escape(error.path)
-            expected = ", ".join('[blue]' + v + '[/]' for v in error.expected)
+            expected = ", ".join(f"[blue]{v}[/]" for v in error.expected)
 
             if error.comment:
                 comment = f" [bright_black]({rich.markup.escape(error.comment)})[/]"
             else:
                 comment = ""
 
-            parse_tree.add(
-                f"[red]{path}[/] is not {expected}{comment}"
-            )
+            parse_tree.add(f"[red]{path}[/] is not {expected}{comment}")
         elif isinstance(error, (BuildError, DeployError)):
             if isinstance(error, DeployError):
                 target_tree = deploy_tree

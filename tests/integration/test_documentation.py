@@ -1,5 +1,6 @@
+import json
 import os.path
-import typing
+import tempfile
 
 import docker
 
@@ -7,9 +8,7 @@ import rich.console
 
 from ctf_builder.cmd.common import CliContext
 
-from ctf_builder.cmd.schema import cli, Args
-
-TEST_CHALLENGES: typing.List[str] = []
+from ctf_builder.cmd.documentation import cli, Args
 
 
 def test():
@@ -23,4 +22,8 @@ def test():
         console=rich.console.Console(quiet=True),
     )
 
-    assert cli(cli_context=context, args=Args(challenge=TEST_CHALLENGES))
+    with tempfile.TemporaryDirectory() as temp_dir:
+        assert cli(cli_context=context, args=Args(output=temp_dir))
+
+        with open(os.path.join(temp_dir, "challenge.json")) as h:
+            assert json.load(h)

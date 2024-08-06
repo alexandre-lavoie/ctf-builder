@@ -119,5 +119,3 @@ def test():
         )
     finally:
         container.remove(force=True)
-
-    # assert cli(cli_context=context, args=Args(challenge=[]))
