@@ -12,7 +12,7 @@ from .cmd.common import CliContext
 
 
 def build_command(
-    subparser: argparse._SubParsersAction[typing.Any],
+    subparser: argparse._SubParsersAction,  # type: ignore
     name: str,
     command: Command,
     root_directory: str,
