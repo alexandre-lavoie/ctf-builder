@@ -20,7 +20,7 @@ class Args:
     output: str
 
 
-def is_optional(ptype: typing.Type):
+def is_optional(ptype: typing.Type[typing.Any]) -> bool:
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)
 
@@ -28,7 +28,7 @@ def is_optional(ptype: typing.Type):
 
 
 def document_type(
-    ptype: typing.Type, description: typing.Optional[str] = None
+    ptype: typing.Type[typing.Any], description: typing.Optional[str] = None
 ) -> typing.Dict[str, typing.Any]:
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)

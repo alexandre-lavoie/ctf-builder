@@ -36,7 +36,7 @@ class User:
     verified: bool = dataclasses.field(default=True)
 
     @classmethod
-    def from_dict(cls, data: typing.Dict) -> "User":
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "User":
         fields = {}
 
         for field in dataclasses.fields(cls):
@@ -48,14 +48,14 @@ class User:
 
         return cls(**fields)
 
-    def to_api(self) -> typing.Dict:
+    def to_api(self) -> typing.Dict[str, typing.Any]:
         d = self.to_dict()
 
         del d["id"]
 
         return d
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(User):
@@ -75,7 +75,7 @@ class Team:
     users: typing.Sequence[User] = dataclasses.field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: typing.Dict) -> "Team":
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "Team":
         fields = {}
 
         for field in dataclasses.fields(cls):
@@ -89,7 +89,7 @@ class Team:
 
         return cls(**fields)
 
-    def to_api(self) -> typing.Dict:
+    def to_api(self) -> typing.Dict[str, typing.Any]:
         d = self.to_dict()
 
         del d["id"]
@@ -97,7 +97,7 @@ class Team:
 
         return d
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(Team):
@@ -188,7 +188,7 @@ def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument("-k", "--api_key", help="API Key", required=True)
     parser.add_argument(
         "-u", "--url", help="URL for CTFd", default="http://localhost:8000"

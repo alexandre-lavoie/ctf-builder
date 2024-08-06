@@ -11,7 +11,7 @@ T = typing.TypeVar("T", bound=Translation)
 
 class BuildTranslation(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Translation) -> typing.Type["BuildTranslation"]:
+    def get(cls, obj: Translation) -> typing.Type["BuildTranslation[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod

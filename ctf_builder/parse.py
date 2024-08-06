@@ -23,7 +23,7 @@ def __get_subclass_from_name(
     return None
 
 
-def __get_subclass_names(target: typing.Type) -> typing.List[str]:
+def __get_subclass_names(target: typing.Type[typing.Any]) -> typing.List[str]:
     self_name = target.__name__
 
     names = []
@@ -33,7 +33,7 @@ def __get_subclass_names(target: typing.Type) -> typing.List[str]:
     return names
 
 
-def __expected(ptype: typing.Type) -> typing.List[str]:
+def __expected(ptype: typing.Type[typing.Any]) -> typing.List[str]:
     if ptype in ATOM_TYPES:
         return [ptype.__name__]
     elif typing.get_origin(ptype) == list:

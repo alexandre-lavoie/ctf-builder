@@ -7,7 +7,7 @@ import typing
 
 import docker
 
-from ..build import BuildBuilder, BuildContext
+from ..build.builder import BuildBuilder, BuildContext
 from ..error import LibError, SkipError
 from ..schema import Track
 

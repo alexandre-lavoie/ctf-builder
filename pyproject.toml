@@ -1,0 +1,9 @@
+[tool.black]
+include = '(ctf_builder|tests|sample)/.*\.py$'
+exclude = '__pycache__|\.mypy_cache|\.pytest_cache|\.venv|build/lib'
+
+[tool.mypy]
+files = ["ctf_builder", "tests"]
+exclude = ["^build/", "^sample/"]
+ignore_missing_imports = true
+strict = true

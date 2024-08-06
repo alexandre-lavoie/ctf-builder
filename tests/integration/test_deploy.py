@@ -15,7 +15,7 @@ from ctf_builder.cmd.stop import cli as stop_cli, Args as StopArgs
 TEST_CHALLENGES: typing.List[str] = []
 
 
-def test():
+def test() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )

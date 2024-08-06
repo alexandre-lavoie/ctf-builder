@@ -11,7 +11,7 @@ from ctf_builder.cmd.common import CliContext
 from ctf_builder.cmd.documentation import cli, Args
 
 
-def test():
+def test() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )

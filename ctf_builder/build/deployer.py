@@ -38,7 +38,7 @@ class DeployContext:
 
 class BuildDeployer(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer"]:
+    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod
@@ -105,8 +105,8 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
         except:
             return False
 
-        status = container.status
-        health = container.health
+        status: str = container.status
+        health: str = container.health
 
         return status == "running" and health == "healthy"
 

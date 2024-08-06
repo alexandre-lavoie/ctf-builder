@@ -31,7 +31,7 @@ TEST_URL = f"http://localhost:{TEST_PORT}/"
 TEST_CHALLENGES: typing.List[str] = []
 
 
-def test():
+def test() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )

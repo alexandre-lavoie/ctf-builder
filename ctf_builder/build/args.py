@@ -11,7 +11,7 @@ T = typing.TypeVar("T", bound=Args)
 
 class BuildArgs(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Args) -> typing.Type["BuildArgs"]:
+    def get(cls, obj: Args) -> typing.Type["BuildArgs[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod

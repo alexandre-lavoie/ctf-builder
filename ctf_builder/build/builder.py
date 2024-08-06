@@ -28,7 +28,7 @@ class BuildContext:
 
 class BuildBuilder(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: T) -> typing.Type["BuildBuilder"]:
+    def get(cls, obj: T) -> typing.Type["BuildBuilder[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod

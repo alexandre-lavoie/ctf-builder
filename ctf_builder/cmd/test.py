@@ -8,8 +8,10 @@ import typing
 
 import docker
 
-from ..build import BuildTester, BuildDeployer, TestContext, DeployContext
+from ..build.deployer import BuildDeployer, DeployContext
+from ..build.tester import BuildTester, TestContext
 from ..build.utils import to_docker_tag
+
 from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
 from ..error import LibError, DeployError
 from ..schema import Track, Deployer
@@ -125,7 +127,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]

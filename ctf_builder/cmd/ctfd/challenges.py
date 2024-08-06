@@ -5,7 +5,10 @@ import os
 import os.path
 import typing
 
-from ...build import BuildTranslation, BuildDeployer, BuildFlag, BuildAttachment
+from ...build.attachment import BuildAttachment
+from ...build.deployer import BuildDeployer
+from ...build.flag import BuildFlag
+from ...build.translation import BuildTranslation
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_MAX_PORTS, CHALLENGE_HOST
 from ...ctfd import CTFdAPI
 from ...error import LibError, BuildError, DeployError
@@ -377,7 +380,7 @@ def deploy_challenge(track: Track, context: Context) -> typing.Sequence[LibError
     return all_errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]

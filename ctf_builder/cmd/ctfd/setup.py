@@ -152,14 +152,14 @@ def setup(context: Context) -> typing.Sequence[LibError]:
             DeployError(
                 context="setup",
                 msg="failed to deploy",
-                error=ValueError(res["message"]),
+                error=ValueError(res.json()["message"]),
             )
         ]
 
     return []
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument(
         "-p", "--password", help="Admin account password", required=True
     )

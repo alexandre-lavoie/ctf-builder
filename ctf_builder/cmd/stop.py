@@ -7,7 +7,7 @@ import typing
 import docker
 import docker.models.networks
 
-from ..build import DeployContext, BuildDeployer
+from ..build.deployer import DeployContext, BuildDeployer
 from ..config import DEPLOY_NETWORK
 from ..error import DeployError, SkipError, LibError, print_errors
 from ..schema import Track
@@ -48,7 +48,7 @@ def stop(track: Track, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]

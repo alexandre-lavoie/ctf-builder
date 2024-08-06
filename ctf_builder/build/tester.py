@@ -33,7 +33,7 @@ class TestContext:
 
 class BuildTester(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Tester) -> typing.Type["BuildTester"]:
+    def get(cls, obj: Tester) -> typing.Type["BuildTester[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod
@@ -56,7 +56,7 @@ class DockerTestContext:
     errors: typing.List[TestError]
 
 
-def docker_test(context: DockerTestContext):
+def docker_test(context: DockerTestContext) -> None:
     error = None
     try:
         context.docker_client.containers.run(

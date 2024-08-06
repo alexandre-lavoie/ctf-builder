@@ -56,7 +56,7 @@ def read_nonce(sess: requests.Session, url: str) -> typing.Optional[str]:
     return match[0] if match else None
 
 
-def read_csrf(sess: requests, url: str) -> typing.Optional[str]:
+def read_csrf(sess: requests.Session, url: str) -> typing.Optional[str]:
     res = sess.get(url)
 
     match = CSRF_RE.findall(res.text)
