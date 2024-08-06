@@ -7,6 +7,8 @@ import uuid
 
 import requests
 
+from ..common import CliContext
+
 
 @dataclasses.dataclass
 class User:
@@ -166,7 +168,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
     out = []

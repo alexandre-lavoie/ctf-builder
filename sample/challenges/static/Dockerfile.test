@@ -5,6 +5,6 @@ WORKDIR /test
 COPY build /test/build
 COPY solve /test/solve
 
-RUN chmod +x /test/build/0/sample
+RUN chmod +x /test/build/challenge
 
 CMD ["python", "/test/solve/solve.py"]

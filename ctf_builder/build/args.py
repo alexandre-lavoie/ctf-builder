@@ -59,9 +59,7 @@ class BuildArgsEnv(BuildArgs):
         key_set = set(args.keys) if args.keys else None
         out = {}
         for line in data.split("\n"):
-            try:
-                offset = line.index("=")
-            except ValueError:
+            if (offset := line.find("=")) == -1:
                 continue
 
             key, value = line[:offset], line[offset + 1 :]

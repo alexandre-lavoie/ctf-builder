@@ -14,7 +14,7 @@ from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
 from ..error import LibError, TestError
 from ..schema import Track
 
-from .common import cli_challenge_wrapper, WrapContext, get_create_network
+from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -43,7 +43,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                 )
 
                 deployer_errors = BuildDeployer.get(deployer).start(
-                    deployer=deployer, context=deployer_context
+                    deployer=deployer, context=deployer_context, skip_reuse=False
                 )
                 errors += deployer_errors
 
@@ -109,17 +109,18 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
-        error_prefix="",
+        error_prefix=[],
         skip_inactive=False,
         docker_client=docker.from_env(),
     )
 
     return cli_challenge_wrapper(
-        root_directory=root_directory,
+        root_directory=cli_context.root_directory,
         challenges=args.challenge,
         context=context,
         callback=test,
+        console=cli_context.console,
     )

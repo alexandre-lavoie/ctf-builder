@@ -11,7 +11,7 @@ from ..build import BuildBuilder, BuildContext
 from ..error import LibError
 from ..schema import Track
 
-from .common import cli_challenge_wrapper, WrapContext
+from .common import cli_challenge_wrapper, WrapContext, CliContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -47,17 +47,18 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
-        error_prefix="",
+        error_prefix=[],
         skip_inactive=False,
         docker_client=docker.from_env(),
     )
 
     return cli_challenge_wrapper(
-        root_directory=root_directory,
+        root_directory=cli_context.root_directory,
         challenges=args.challenge,
         context=context,
         callback=build,
+        console=cli_context.console,
     )

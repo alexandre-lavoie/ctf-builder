@@ -7,6 +7,8 @@ import typing
 
 from ..schema import Track, Path
 
+from .common import CliContext
+
 ATOM_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
 
@@ -85,7 +87,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     parser.add_argument("-o", "--output", help="Output file", default="schema.json")
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     with open(args.output, "w") as h:
         json.dump(document_type(Track), h, indent=2)
 

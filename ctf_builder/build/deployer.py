@@ -7,8 +7,7 @@ import docker
 import docker.errors
 import docker.types
 
-from ..error import DeployError, LibError, SkipError
-from ..logging import LOG
+from ..error import BuildError, DeployError, LibError, SkipError
 from ..schema import Deployer, DeployerDocker, PortProtocol
 
 from .args import BuildArgs
@@ -71,7 +70,7 @@ class BuildDeployer(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def start(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: Deployer, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
         return []
 
@@ -138,18 +137,18 @@ class BuildDeployerDocker(BuildDeployer):
 
     @classmethod
     def start(
-        cls, context: DeployContext, deployer: DeployerDocker
+        cls, context: DeployContext, deployer: DeployerDocker, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
-            return [DeployError("No docker client")]
+            return [BuildError(context="Docker", msg="client not initialized")]
 
         if deployer.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
             dockerfile = deployer.path.resolve(context.path)
 
-        if dockerfile is None or not os.path.exists(dockerfile):
-            return [DeployError("Dockerfile is invalid")]
+        if dockerfile is None or not os.path.isfile(dockerfile):
+            return [BuildError(context="Dockerfile", msg="is not a file")]
 
         dockerfile = os.path.abspath(dockerfile)
 
@@ -157,7 +156,9 @@ class BuildDeployerDocker(BuildDeployer):
         build_args = {}
         for args in deployer.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
-                errors.append("invalid build args")
+                errors.append(
+                    BuildError(context=context.name, msg="invalid build args")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -166,7 +167,9 @@ class BuildDeployerDocker(BuildDeployer):
         environment = {}
         for env in deployer.env:
             if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
-                errors.append("invalid environment")
+                errors.append(
+                    BuildError(context=context.name, msg="invalid environment")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -178,14 +181,10 @@ class BuildDeployerDocker(BuildDeployer):
                 dockerfile=dockerfile,
                 buildargs=build_args,
             )
-
-            for log in logs:
-                if "stream" not in log:
-                    continue
-
-                LOG.info(log["stream"].strip())
         except docker.errors.BuildError as e:
-            return errors + [DeployError(f"Dockerfile failed to build > {e}")]
+            return errors + [
+                BuildError(context="Dockerfile", msg="failed to build", error=e)
+            ]
 
         port_bindings = {}
         for port in deployer.ports:
@@ -232,12 +231,19 @@ class BuildDeployerDocker(BuildDeployer):
 
             return []
         except docker.errors.ImageNotFound:
-            errors.append(DeployError("image not found for container"))
+            errors.append(DeployError(context=context.name, msg="image not found"))
         except docker.errors.APIError as e:
             if "reuse that name" in str(e):
-                errors.append(SkipError())
+                if skip_reuse:
+                    errors.append(SkipError())
+                else:
+                    errors.append(
+                        DeployError(context=context.name, msg="failed to deploy due to duplicate container", error=e)
+                    )
             else:
-                errors.append(DeployError(f"api error when creating container > {e}"))
+                errors.append(
+                    DeployError(context=context.name, msg="failed to deploy", error=e)
+                )
 
         return errors
 
@@ -254,6 +260,6 @@ class BuildDeployerDocker(BuildDeployer):
         except docker.errors.NotFound:
             return [SkipError()]
         except docker.errors.APIError as e:
-            [DeployError(f"api error when creating container > {e}")]
+            [DeployError(context=context.name, msg="failed to deploy", error=e)]
 
         return []

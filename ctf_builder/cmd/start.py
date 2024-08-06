@@ -10,7 +10,7 @@ import docker.models.networks
 
 from ..build import DeployContext, BuildDeployer
 from ..config import CHALLENGE_MAX_PORTS, CHALLENGE_BASE_PORT, DEPLOY_NETWORK
-from ..error import DeployError, LibError, print_errors
+from ..error import DeployError, SkipError, LibError, print_errors
 from ..schema import Track
 
 from .common import (
@@ -20,6 +20,7 @@ from .common import (
     port_generator,
     get_create_network,
     get_challenge_index,
+    CliContext
 )
 
 
@@ -34,6 +35,9 @@ class Context(WrapContext):
 
 
 def start(track: Track, context: Context) -> typing.Sequence[LibError]:
+    if not track.deploy:
+        return [SkipError()]
+
     next_port = port_generator(
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
@@ -45,8 +49,8 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
 
         if build.has_host(deployer) and not host:
             if (host := next(context.host_generator)) is None:
-                errors.append(DeployError("no more host ip"))
-                continue
+                errors.append(DeployError(context=track.name, msg="no more host ip"))
+                break
 
         errors += build.start(
             deployer=deployer,
@@ -91,7 +95,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     docker_client = docker.from_env()
 
     next_host = host_generator(args.ip if args.ip else ["0.0.0.0"])
@@ -101,12 +105,14 @@ def cli(args, root_directory: str) -> bool:
     for arg_network in arg_networks:
         network = get_create_network(docker_client, arg_network)
         if network is None:
-            print_errors(arg_network, [DeployError("not started")])
+            print_errors(
+                arg_network, [DeployError(context=arg_network, msg="not started")]
+            )
             continue
 
         context = Context(
             challenge_path="",
-            error_prefix=f"{network.name} > " if len(arg_networks) > 1 else "",
+            error_prefix=[network.name] if len(arg_networks) > 1 else [],
             skip_inactive=False,
             network=network,
             docker_client=docker_client,
@@ -115,10 +121,11 @@ def cli(args, root_directory: str) -> bool:
         )
 
         if not cli_challenge_wrapper(
-            root_directory=root_directory,
+            root_directory=cli_context.root_directory,
             challenges=args.challenge,
             context=context,
             callback=start,
+            console=cli_context.console,
         ):
             is_ok = False
 

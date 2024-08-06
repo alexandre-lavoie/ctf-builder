@@ -3,17 +3,32 @@ import glob
 import json
 import os.path
 import threading
+import time
 import typing
 
 import docker
 import docker.errors
 import docker.models.networks
 
-from ..config import CHALLENGE_MAX_PORTS
-from ..error import ParseError, LibError, SkipError, print_errors, get_exit_status
-from ..parse import parse_track
-from ..schema import Track
+import rich.console
+import rich.progress
 
+from ..config import CHALLENGE_MAX_PORTS
+from ..error import BuildError, LibError, SkipError, print_errors, get_exit_status
+from ..parse import parse_track
+from ..schema import Track, PortProtocol
+
+@dataclasses.dataclass(frozen=True)
+class WrapContext:
+    challenge_path: str
+    error_prefix: typing.List[str]
+    skip_inactive: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class CliContext:
+    root_directory: str
+    console: typing.Optional[rich.console.Console]
 
 def host_generator(
     ips: typing.Sequence[str],
@@ -46,6 +61,21 @@ def get_network(
     return None
 
 
+def build_connection_string(
+    host: str, port: int, protocol: PortProtocol, path: typing.Optional[str] = None
+) -> str:
+    if protocol is PortProtocol.HTTP:
+        return f"http://{host}:{port}{path}"
+    elif protocol is PortProtocol.HTTPS:
+        return f"https://{host}:{port}{path}"
+    elif protocol is PortProtocol.TCP:
+        return f"nc {host} {port}"
+    elif protocol is PortProtocol.UDP:
+        return f"nc -u {host} {port}"
+
+    assert False, f"unhandled {protocol}"
+
+
 def get_create_network(
     client: docker.DockerClient, name: typing.Optional[str] = None
 ) -> typing.Optional[docker.models.networks.Network]:
@@ -59,13 +89,6 @@ def get_create_network(
         pass
 
     return None
-
-
-@dataclasses.dataclass(frozen=True)
-class WrapContext:
-    challenge_path: str
-    error_prefix: str
-    skip_inactive: bool
 
 
 def get_challenges(root_directory: str) -> typing.Sequence[str]:
@@ -82,7 +105,7 @@ def get_challenges(root_directory: str) -> typing.Sequence[str]:
 
 
 def get_challenge_index(challenge_path: str) -> int:
-    challenges = get_challenges(os.path.basename(os.path.basename(challenge_path)))
+    challenges = get_challenges(os.path.dirname(os.path.dirname(challenge_path)))
     return challenges.index(os.path.basename(challenge_path))
 
 
@@ -106,14 +129,16 @@ def cli_challenge(
 ) -> bool:
     json_path = os.path.join(context.challenge_path, "challenge.json")
     if not os.path.isfile(json_path):
-        errors.append(ParseError(json_path, ["existing"]))
+        errors.append(BuildError(context="challenge.json", msg="is not a file"))
         return False
 
     try:
         with open(json_path) as h:
             raw_track = json.load(h)
-    except:
-        errors.append(ParseError(json_path, ["valid"]))
+    except Exception as e:
+        errors.append(
+            BuildError(context="challenge.json", msg="is not valid JSON", error=e)
+        )
         return False
 
     track, parse_errors = parse_track(raw_track)
@@ -135,6 +160,7 @@ def cli_challenge_wrapper(
     challenges: typing.Sequence[str],
     context: WrapContext,
     callback: typing.Callable[[Track, WrapContext], typing.Sequence[LibError]],
+    console: typing.Optional[rich.console.Console] = None,
 ) -> bool:
     if not challenges:
         challenges = get_challenges(root_directory)
@@ -142,7 +168,7 @@ def cli_challenge_wrapper(
     skip_inactive = True if len(challenges) <= 1 else False
 
     error_map: typing.Dict[str, typing.List[LibError]] = {}
-    threads: typing.List[threading.Thread] = []
+    threads: typing.List[typing.Tuple[threading.Thread, str]] = []
     for challenge in challenges:
         errors = []
         error_map[challenge] = errors
@@ -153,26 +179,53 @@ def cli_challenge_wrapper(
         )
 
         threads.append(
-            threading.Thread(
-                target=cli_challenge,
-                kwargs={
-                    "context": challenge_context,
-                    "callback": callback,
-                    "errors": errors,
-                },
+            (
+                threading.Thread(
+                    target=cli_challenge,
+                    kwargs={
+                        "context": challenge_context,
+                        "callback": callback,
+                        "errors": errors,
+                    },
+                ),
+                challenge,
             )
         )
 
-    for thread in threads:
+    for thread, _ in threads:
         thread.start()
 
-    for thread in threads:
-        thread.join()
-
     all_errors = []
-    for challenge, errors in error_map.items():
-        all_errors += errors
 
-        print_errors(context.error_prefix + challenge, errors)
+    with rich.progress.Progress(
+        rich.progress.TextColumn("{task.description}"),
+        rich.progress.TimeElapsedColumn(),
+        rich.progress.SpinnerColumn(style="progress.elapsed"),
+        console=console,
+    ) as progress:
+        challenge_tasks = {}
+        for _, challenge in threads:
+            task_id = progress.add_task(challenge)
+            challenge_tasks[challenge] = progress.tasks[task_id]
+
+        running_queue: typing.List[typing.Tuple[threading.Thread, str]] = [*threads]
+        while running_queue:
+            thread, challenge = running_queue.pop(0)
+
+            if thread.is_alive():
+                running_queue.append((thread, challenge))
+                time.sleep(0.1)
+                continue
+
+            errors = error_map[challenge]
+            all_errors += errors
+
+            print_errors(
+                console=console,
+                prefix=context.error_prefix + [challenge],
+                errors=errors,
+                elapsed_time=challenge_tasks[challenge].elapsed
+            )
+            progress.remove_task(challenge_tasks[challenge].id)
 
     return get_exit_status(all_errors)

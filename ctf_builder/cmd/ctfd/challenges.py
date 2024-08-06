@@ -1,19 +1,25 @@
 import argparse
 import dataclasses
 import glob
-import json
 import os
 import os.path
 import typing
 
 import requests
 
-from ...build import *
+from ...build import BuildTranslation, BuildDeployer, BuildFlag, BuildAttachment
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_MAX_PORTS, CHALLENGE_HOST
-from ...error import LibError, BuildError
-from ...schema import *
+from ...error import LibError, BuildError, DeployError
+from ...schema import Track, Translation
 
-from ..common import WrapContext, cli_challenge_wrapper, get_challenge_index
+from ..common import CliContext
+
+from ..common import (
+    WrapContext,
+    cli_challenge_wrapper,
+    get_challenge_index,
+    build_connection_string,
+)
 
 
 def build_translation(
@@ -73,12 +79,18 @@ def build_create_challenges(
 
         description = build_translation(context.challenge_path, challenge.descriptions)
         if description is None:
-            errors.append(BuildError(f"challenge {i} has an invalid description"))
+            errors.append(
+                BuildError(context=f"Challenge {i}", msg="has an invalid description")
+            )
             continue
 
         if challenge.host is not None:
             if challenge.host.index < 0 or challenge.host.index >= len(deploy_ports):
-                errors.append(BuildError(f"challenge {i} has an invalid host index"))
+                errors.append(
+                    BuildError(
+                        context=f"Challenge {i}", msg="has an invalid host index"
+                    )
+                )
                 continue
 
             for deploy_port in deploy_ports[challenge.host.index]:
@@ -89,24 +101,19 @@ def build_create_challenges(
             else:
                 errors.append(
                     BuildError(
-                        f"challenge {i} has an invalid host with no public ports"
+                        context=f"Challenge {i}",
+                        msg="host has no public ports, remove field if this is intentional",
                     )
                 )
                 continue
 
             protocol, port_value = deploy_port
-            if protocol is PortProtocol.HTTP:
-                connection_info = (
-                    f"http://{CHALLENGE_HOST}:{port_value}{challenge.host.path}"
-                )
-            elif protocol is PortProtocol.HTTPS:
-                connection_info = (
-                    f"https://{CHALLENGE_HOST}:{port_value}{challenge.host.path}"
-                )
-            elif protocol is PortProtocol.TCP:
-                connection_info = f"nc {CHALLENGE_HOST} {port_value}"
-            elif protocol is PortProtocol.UDP:
-                connection_info = f"nc -u {CHALLENGE_HOST} {port_value}"
+            connection_info = build_connection_string(
+                host=CHALLENGE_HOST,
+                protocol=protocol,
+                port=port_value,
+                path=challenge.host.path,
+            )
         else:
             connection_info = None
 
@@ -137,7 +144,13 @@ def post_create_challenges(
         )
 
         if res.status_code != 200:
-            errors.append(BuildError(f"failed to create challenge {i}"))
+            errors.append(
+                BuildError(
+                    context=f"Challenge {i}",
+                    msg="failed to create",
+                    error=ValueError(res.json()["message"]),
+                )
+            )
             continue
 
         data = res.json()["data"]
@@ -190,7 +203,13 @@ def post_create_flags(
         )
 
         if res.status_code != 200:
-            errors.append(BuildError(f"failed to build flag in challenge {i}"))
+            errors.append(
+                BuildError(
+                    context=f"Flag {i} of challenge {req.challenge}",
+                    msg="failed to created",
+                    error=ValueError(res.json()["message"]),
+                )
+            )
             continue
 
     return errors
@@ -202,13 +221,17 @@ def post_attachments(
     errors = []
 
     for id, challenge in zip(ids, track.challenges):
-        for attachment in challenge.attachments:
+        for i, attachment in enumerate(challenge.attachments):
             if (
                 out := BuildAttachment.get(attachment).build(
                     context.challenge_path, attachment
                 )
             ) is None:
-                errors.append(BuildError(f"attachment is not valid for challenge {id}"))
+                errors.append(
+                    BuildError(
+                        context=f"Attachment {i} of challenge {id}", msg="is not valid"
+                    )
+                )
                 continue
 
             name, fh = out
@@ -222,7 +245,11 @@ def post_attachments(
 
             if res.status_code != 200:
                 errors.append(
-                    BuildError(f"failed to build attachment in challenge {id}")
+                    DeployError(
+                        context=f"Attachment {i} of challenge {id}",
+                        msg="failed to create",
+                        error=ValueError(res.json()["message"]),
+                    )
                 )
                 continue
 
@@ -235,11 +262,13 @@ def post_hints(
     errors = []
 
     for id, challenge in zip(ids, track.challenges):
-        for hint in challenge.hints:
+        for i, hint in enumerate(challenge.hints):
             content = build_translation(context.challenge_path, hint.texts)
             if content is None:
                 errors.append(
-                    BuildError(f"content in hint of challenge {id} is invalid")
+                    BuildError(
+                        context=f"Hint {i} of challenge {id}", msg="is not valid"
+                    )
                 )
                 continue
 
@@ -250,7 +279,13 @@ def post_hints(
             )
 
             if res.status_code != 200:
-                errors.append(BuildError(f"failed to build hint in challenge {id}"))
+                errors.append(
+                    DeployError(
+                        context=f"Hint {i} of challenge {id}",
+                        msg="failed to create",
+                        error=ValueError(res.json()["message"]),
+                    )
+                )
                 continue
 
     return errors
@@ -283,14 +318,21 @@ def patch_references(
 
             if res.status_code != 200:
                 errors.append(
-                    BuildError(f"failed to patch requirements in challenge {id}")
+                    DeployError(
+                        context=f"Challenge {id}",
+                        msg="failed to update prerequisites",
+                        error=ValueError(res.json()["message"]),
+                    )
                 )
                 continue
 
         if challenge.next is not None:
-            if challenge.next >= len(ids):
+            if challenge.next < 0 or challenge.next >= len(ids):
                 errors.append(
-                    f"next {challenge.next} is out of range for challenge {id}"
+                    DeployError(
+                        context=f"Challenge {id}",
+                        msg="next is out of range",
+                    )
                 )
                 continue
 
@@ -301,7 +343,13 @@ def patch_references(
             )
 
             if res.status_code != 200:
-                errors.append(BuildError(f"failed to patch next_id in challenge {id}"))
+                errors.append(
+                    DeployError(
+                        context=f"Challenge {id}",
+                        msg="failed to update next",
+                        error=ValueError(res.json()["message"]),
+                    )
+                )
                 continue
 
     return errors
@@ -355,10 +403,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
-        error_prefix="",
+        error_prefix=[],
         skip_inactive=False,
         url=args.url,
         api_key=args.api_key,
@@ -366,8 +414,9 @@ def cli(args, root_directory: str) -> bool:
     )
 
     return cli_challenge_wrapper(
-        root_directory=root_directory,
+        root_directory=cli_context.root_directory,
         challenges=args.challenge,
         context=context,
         callback=deploy_challenge,
+        console=cli_context.console,
     )

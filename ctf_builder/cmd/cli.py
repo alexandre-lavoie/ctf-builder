@@ -26,11 +26,12 @@ from .ctfd.setup import cli_args as ctfd_setup_args
 from .ctfd.teams import cli as ctfd_teams_cli
 from .ctfd.teams import cli_args as ctfd_teams_args
 
+from .common import CliContext
 
 @dataclasses.dataclass
 class Command:
     args: typing.Callable[[argparse.ArgumentParser, str], None]
-    cli: typing.Callable[[typing.Any, str], bool]
+    cli: typing.Callable[[typing.Any, CliContext], bool]
     help: typing.Optional[str] = dataclasses.field(default=None)
 
 

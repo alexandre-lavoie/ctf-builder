@@ -8,6 +8,8 @@ import typing
 
 import requests
 
+from ..common import CliContext
+
 
 @dataclasses.dataclass
 class SetupFiles:
@@ -153,5 +155,5 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args, cli_context: CliContext) -> bool:
     return build_setup(args.url, args.file, args.name, args.email, args.password)
