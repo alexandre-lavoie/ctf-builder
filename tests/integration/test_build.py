@@ -1,4 +1,5 @@
 import os.path
+import typing
 
 import docker
 
@@ -7,6 +8,8 @@ import rich.console
 from ctf_builder.cmd.common import CliContext
 
 from ctf_builder.cmd.build import cli, Args
+
+TEST_CHALLENGES: typing.List[str] = []
 
 
 def test():
@@ -20,4 +23,4 @@ def test():
         console=rich.console.Console(quiet=True),
     )
 
-    assert cli(cli_context=context, args=Args(challenge=[]))
+    assert cli(cli_context=context, args=Args(challenge=TEST_CHALLENGES))

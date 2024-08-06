@@ -15,7 +15,7 @@ from ..common import CliContext
 class Args:
     api_key: str
     file: str
-    output: str
+    output: typing.Union[str, typing.TextIO]
     url: str = dataclasses.field(default="http://localhost:8000")
 
 
@@ -214,7 +214,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     all_errors: typing.List[LibError] = []
 
-    out: typing.List[Team] = []
+    out_teams: typing.List[Team] = []
     for team in teams:
         errors = deploy_team(team, context)
         all_errors += errors
@@ -226,12 +226,16 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         )
 
         if not errors:
-            out.append(team)
+            out_teams.append(team)
 
     if cli_context.console:
         cli_context.console.print()
 
-    with open(args.output, "w") as h:
-        json.dump([team.to_dict() for team in out], h, indent=2)
+    out_json = [team.to_dict() for team in out_teams]
+    if isinstance(args.output, str):
+        with open(args.output, "w") as h:
+            json.dump(out_json, h, indent=2)
+    else:
+        json.dump(out_json, args.output, indent=2)
 
     return get_exit_status(all_errors)

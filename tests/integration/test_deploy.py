@@ -1,4 +1,5 @@
 import os.path
+import typing
 import uuid
 
 import docker
@@ -10,6 +11,8 @@ from ctf_builder.cmd.common import CliContext
 
 from ctf_builder.cmd.start import cli as start_cli, Args as StartArgs
 from ctf_builder.cmd.stop import cli as stop_cli, Args as StopArgs
+
+TEST_CHALLENGES: typing.List[str] = []
 
 
 def test():
@@ -29,7 +32,7 @@ def test():
         assert start_cli(
             cli_context=context,
             args=StartArgs(
-                challenge=[],
+                challenge=TEST_CHALLENGES,
                 ip=[None],
                 network=[network],
                 port=CHALLENGE_BASE_PORT,
@@ -38,5 +41,6 @@ def test():
         )
     finally:
         assert stop_cli(
-            cli_context=context, args=StopArgs(challenge=[], network=[network])
+            cli_context=context,
+            args=StopArgs(challenge=TEST_CHALLENGES, network=[network]),
         )
