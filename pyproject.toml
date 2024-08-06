@@ -1,5 +1,5 @@
 [tool.black]
-include = '(ctf_builder|tests|sample)/.*\.py$'
+include = '(ctf_builder|sample|tests)/.*\.py$'
 exclude = '__pycache__|\.mypy_cache|\.pytest_cache|\.venv|build/lib'
 
 [tool.mypy]
