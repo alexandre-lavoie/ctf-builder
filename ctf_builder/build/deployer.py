@@ -45,26 +45,14 @@ class BuildDeployer(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def has_host(cls, deployer: DeployerDocker) -> bool:
-        return False
-
-    @classmethod
-    @abc.abstractmethod
-    def public_ports(
+    def ports(
         cls, deployer: DeployerDocker
     ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
         return []
 
     @classmethod
     @abc.abstractmethod
-    def deploy_ports(
-        cls, deployer: DeployerDocker, port: int
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        return []
-
-    @classmethod
-    @abc.abstractmethod
-    def is_active(cls, context: DeployContext, deployer: Deployer) -> bool:
+    def is_healthy(cls, context: DeployContext, deployer: Deployer) -> bool:
         return False
 
     @classmethod
@@ -77,7 +65,7 @@ class BuildDeployer(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def stop(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: Deployer, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
         return []
 
@@ -88,45 +76,32 @@ class BuildDeployerDocker(BuildDeployer):
         return DeployerDocker
 
     @classmethod
-    def get_name(cls, context: DeployContext) -> str:
+    def get_dns_name(cls, context: DeployContext) -> str:
         return to_docker_tag(context.name)
 
     @classmethod
-    def has_host(cls, deployer: DeployerDocker) -> bool:
-        return any(port.public for port in deployer.ports)
+    def get_container_name(cls, context: DeployContext) -> str:
+        if context.network:
+            return to_docker_tag(f"{context.network}_{context.name}")
+
+        return cls.get_dns_name(context)
 
     @classmethod
-    def public_ports(
+    def ports(
         cls, deployer: DeployerDocker
     ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
         return [
-            (port.protocol, port.port) if port.public else None
+            (port.protocol, port.port)
             for port in deployer.ports
         ]
 
     @classmethod
-    def deploy_ports(
-        cls, deployer: DeployerDocker, port: int
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        out = []
-        for p in deployer.ports:
-            if p.public:
-                v = port
-                port += 1
-            else:
-                v = None
-
-            out.append((p.protocol, v))
-
-        return out
-
-    @classmethod
-    def is_active(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
+    def is_healthy(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
         if context.docker_client is None:
             return False
 
         try:
-            container = context.docker_client.containers.get(cls.get_name(context))
+            container = context.docker_client.containers.get(cls.get_container_name(context))
         except:
             return False
 
@@ -187,25 +162,30 @@ class BuildDeployerDocker(BuildDeployer):
             ]
 
         port_bindings = {}
-        for port in deployer.ports:
-            if not port.public:
-                continue
-
-            if context.host:
+        if context.host:
+            for port in deployer.ports:
                 port_bindings[port.port] = (context.host, next(context.port_generator))
 
         if errors:
             return errors
 
-        aliases = [cls.get_name(context)]
+        aliases = []
+
+        dns_name = cls.get_dns_name(context)
+        aliases.append(dns_name)
+
+        container_name = cls.get_container_name(context)
+        if container_name != dns_name:
+            aliases.append(container_name)
+
         if deployer.name:
-            aliases += [to_docker_tag(deployer.name)]
+            aliases.append(to_docker_tag(deployer.name))
 
         try:
             context.docker_client.containers.run(
                 image=image,
                 detach=True,
-                name=cls.get_name(context),
+                name=container_name,
                 environment=environment,
                 ports=port_bindings,
                 network=context.network,
@@ -249,17 +229,18 @@ class BuildDeployerDocker(BuildDeployer):
 
     @classmethod
     def stop(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: Deployer, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
-        name = to_docker_tag(context.name)
-
         try:
-            container = context.docker_client.containers.get(name)
+            container = context.docker_client.containers.get(cls.get_container_name(context))
 
             container.remove(force=True)
         except docker.errors.NotFound:
-            return [SkipError()]
+            if skip_not_found:
+                return [SkipError()]
+            else:
+                return [DeployError(context=context.name, msg="failed to stop", error=e)]
         except docker.errors.APIError as e:
-            [DeployError(context=context.name, msg="failed to deploy", error=e)]
+            [DeployError(context=context.name, msg="failed to stop", error=e)]
 
         return []

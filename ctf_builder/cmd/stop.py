@@ -32,10 +32,10 @@ def stop(track: Track, context: Context) -> typing.Sequence[LibError]:
         errors += BuildDeployer.get(deployer).stop(
             deployer=deployer,
             context=DeployContext(
-                name=f"{context.network.name}_{track.name}_{i}",
+                name=f"{track.tag or track.name}_{i}",
                 path=context.challenge_path,
                 docker_client=context.docker_client,
-                network=context.network.id,
+                network=context.network.name,
             ),
         )
 
@@ -69,7 +69,9 @@ def cli(args, cli_context: CliContext) -> bool:
         network = get_network(docker_client, arg_network)
         if network is None:
             print_errors(
-                arg_network, [DeployError(context=arg_network, msg="not found")]
+                prefix=[arg_network],
+                errors=[DeployError(context=arg_network, msg="not found")],
+                console=cli_context.console
             )
             continue
 

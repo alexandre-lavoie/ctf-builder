@@ -1,0 +1,7 @@
+FROM python:alpine AS test
+
+WORKDIR /test
+
+COPY solve /test/solve
+
+CMD ["python", "/test/solve/solve.py"]

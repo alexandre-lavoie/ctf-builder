@@ -1,11 +1,14 @@
 {
   "$schema": "../../schema.json",
-  "name": "Static",
+  "name": "Deploy",
   "active": true,
   "challenges": [
     {
       "category": "Sample",
       "value": 0,
+      "host": {
+        "index": 0
+      },
       "descriptions": [
         {
           "$type": "english",
@@ -34,11 +37,6 @@
           "$type": "directory",
           "path": "challenge",
           "name": "source.zip"
-        },
-        {
-          "$type": "file",
-          "path": "build/challenge",
-          "name": "challenge"
         }
       ],
       "hints": [
@@ -58,17 +56,17 @@
       ]
     }
   ],
-  "build": [
+  "deploy": [
     {
       "$type": "docker",
-      "path": "Dockerfile.build",
-      "files": [
+      "path": "challenge/Dockerfile",
+      "ports": [
         {
-          "source": "/build/challenge",
-          "destination": "build/challenge"
+          "port": 9001,
+          "protocol": "tcp"
         }
       ],
-      "args": [
+      "env": [
         {
           "$type": "env",
           "path": "FLAG",
@@ -76,7 +74,14 @@
             "FLAG"
           ]
         }
-      ]
+      ],
+      "healthcheck": {
+        "test": "netstat -ltn | grep -c 9001",
+        "retries": 3,
+        "start_period": 0,
+        "interval": 0.5,
+        "timeout": 1.5
+      }
     }
   ],
   "test": [

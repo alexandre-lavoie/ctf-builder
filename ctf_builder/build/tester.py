@@ -199,18 +199,19 @@ class BuildTesterDocker(BuildTester):
                     ))
                     continue
 
-                challenge_host = f"{context.network}_{challenge.host.index}"
+                challenge_host = f"host_{challenge.host.index}"
 
                 deployer = context.deployers[challenge.host.index]
 
-                for data in BuildDeployer.get(deployer).public_ports(deployer):
-                    if data is None:
-                        continue
+                ports = BuildDeployer.get(deployer).ports(deployer)
+                if not ports:
+                    errors.append(BuildError(
+                        context=f"Challenge {challenge_id}",
+                        msg="no exposed ports"
+                    ))
+                    continue
 
-                    _, challenge_port = data
-                    break
-                else:
-                    challenge_port = None
+                _, challenge_port = ports[0]
             else:
                 challenge_host = None
                 challenge_port = None

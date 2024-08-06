@@ -1,11 +1,15 @@
 {
   "$schema": "../../schema.json",
-  "name": "Static",
+  "name": "Multiple Deploy",
+  "tag": "multi-deploy",
   "active": true,
   "challenges": [
     {
       "category": "Sample",
       "value": 0,
+      "host": {
+        "index": 1
+      },
       "descriptions": [
         {
           "$type": "english",
@@ -34,11 +38,6 @@
           "$type": "directory",
           "path": "challenge",
           "name": "source.zip"
-        },
-        {
-          "$type": "file",
-          "path": "build/challenge",
-          "name": "challenge"
         }
       ],
       "hints": [
@@ -58,17 +57,12 @@
       ]
     }
   ],
-  "build": [
+  "deploy": [
     {
       "$type": "docker",
-      "path": "Dockerfile.build",
-      "files": [
-        {
-          "source": "/build/challenge",
-          "destination": "build/challenge"
-        }
-      ],
-      "args": [
+      "name": "multi-deploy-app",
+      "path": "challenge/server/Dockerfile",
+      "env": [
         {
           "$type": "env",
           "path": "FLAG",
@@ -76,7 +70,31 @@
             "FLAG"
           ]
         }
-      ]
+      ],
+      "healthcheck": {
+        "test": "netstat -ltn | grep -c 9001",
+        "retries": 3,
+        "start_period": 0,
+        "interval": 0.5,
+        "timeout": 1.5
+      }
+    },
+    {
+      "$type": "docker",
+      "name": "multi-deploy-proxy",
+      "path": "challenge/proxy/Dockerfile",
+      "ports": [
+        {
+          "port": 9001,
+          "protocol": "tcp"
+        }
+      ],
+      "healthcheck": {
+        "test": "service nginx status || exit 1",
+        "retries": 3,
+        "interval": 0.5,
+        "timeout": 1.5
+      }
     }
   ],
   "test": [

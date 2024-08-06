@@ -70,12 +70,14 @@ def print_errors(
         prefix_text = None
 
     is_ok = True
+    is_skip = False
     if not errors:
         status = "[bold green]OK[/]"
         status_color = "green"
     elif all(isinstance(error, SkipError) for error in errors):
         status = "[bold yellow]SKIP[/]"
         status_color = "yellow"
+        is_skip = True
     else:
         status = "[bold red]ERROR[/]"
         status_color = "red"
@@ -83,7 +85,7 @@ def print_errors(
 
     status_text = rich.markup.render(status)
 
-    if elapsed_time is not None:
+    if not is_skip and elapsed_time is not None:
         time_text = rich.text.Text(str(datetime.timedelta(seconds=max(0, int(elapsed_time)))), style=status_color)
     else:
         time_text = None

@@ -65,12 +65,13 @@ def build_create_challenges(
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    deploy_ports = []
+    deploy_ports_list = []
     for deployer in track.deploy:
-        ports = BuildDeployer.get(deployer).deploy_ports(deployer, base_port)
-
-        deploy_ports.append(ports)
-        base_port += len(ports)
+        ports = []
+        for protocol, _ in BuildDeployer.get(deployer).ports(deployer):
+            ports.append((protocol, base_port))
+            base_port += 1
+        deploy_ports_list.append(ports)
 
     for i, challenge in enumerate(track.challenges):
         name = track.name
@@ -85,7 +86,7 @@ def build_create_challenges(
             continue
 
         if challenge.host is not None:
-            if challenge.host.index < 0 or challenge.host.index >= len(deploy_ports):
+            if challenge.host.index < 0 or challenge.host.index >= len(deploy_ports_list):
                 errors.append(
                     BuildError(
                         context=f"Challenge {i}", msg="has an invalid host index"
@@ -93,21 +94,17 @@ def build_create_challenges(
                 )
                 continue
 
-            for deploy_port in deploy_ports[challenge.host.index]:
-                if deploy_port is None:
-                    continue
-
-                break
-            else:
+            deploy_ports = deploy_ports[challenge.host.index]
+            if not deploy_ports:
                 errors.append(
                     BuildError(
                         context=f"Challenge {i}",
-                        msg="host has no public ports, remove field if this is intentional",
+                        msg="host has no exposed ports, remove link if this is intentional",
                     )
                 )
                 continue
 
-            protocol, port_value = deploy_port
+            protocol, port_value = deploy_ports[0]
             connection_info = build_connection_string(
                 host=CHALLENGE_HOST,
                 protocol=protocol,

@@ -8,7 +8,7 @@ import typing
 import docker
 
 from ..build import BuildBuilder, BuildContext
-from ..error import LibError
+from ..error import LibError, SkipError
 from ..schema import Track
 
 from .common import cli_challenge_wrapper, WrapContext, CliContext
@@ -20,6 +20,9 @@ class Context(WrapContext):
 
 
 def build(track: Track, context: Context) -> typing.Sequence[LibError]:
+    if not track.build:
+        return [SkipError()]
+
     errors = []
     for builder in track.build:
         errors += BuildBuilder.get(builder).build(

@@ -18,6 +18,8 @@ from ..error import BuildError, LibError, SkipError, print_errors, get_exit_stat
 from ..parse import parse_track
 from ..schema import Track, PortProtocol
 
+MAX_TCP_PORT = 65_535
+
 @dataclasses.dataclass(frozen=True)
 class WrapContext:
     challenge_path: str
@@ -30,19 +32,16 @@ class CliContext:
     root_directory: str
     console: typing.Optional[rich.console.Console]
 
-def host_generator(
-    ips: typing.Sequence[str],
-) -> typing.Generator[typing.Optional[str], None, None]:
-    for ip in ips:
-        yield ip
-
-    while True:
-        yield None
-
 
 def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, None]:
-    for next_port in range(port, port + CHALLENGE_MAX_PORTS):
-        yield next_port
+    max_port = min(port + CHALLENGE_MAX_PORTS, MAX_TCP_PORT)
+    while True:
+        if port < 0 or port > max_port:
+            break
+
+        yield port
+
+        port += 1
 
     while True:
         yield None

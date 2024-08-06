@@ -16,7 +16,6 @@ from ..schema import Track
 from .common import (
     cli_challenge_wrapper,
     WrapContext,
-    host_generator,
     port_generator,
     get_create_network,
     get_challenge_index,
@@ -27,8 +26,8 @@ from .common import (
 @dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     network: docker.models.networks.Network
+    host: str
     port: int
-    host_generator: typing.Generator[typing.Optional[str], None, None]
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
         default=None
     )
@@ -42,24 +41,16 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    host = None
     errors = []
     for i, deployer in enumerate(track.deploy):
-        build = BuildDeployer.get(deployer)
-
-        if build.has_host(deployer) and not host:
-            if (host := next(context.host_generator)) is None:
-                errors.append(DeployError(context=track.name, msg="no more host ip"))
-                break
-
-        errors += build.start(
+        errors += BuildDeployer.get(deployer).start(
             deployer=deployer,
             context=DeployContext(
-                name=f"{context.network.name}_{track.name}_{i}",
+                name=f"{track.tag or track.name}_{i}",
                 path=context.challenge_path,
                 docker_client=context.docker_client,
-                network=context.network.id,
-                host=host,
+                network=context.network.name,
+                host=context.host,
                 port_generator=next_port,
             ),
         )
@@ -98,15 +89,25 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 def cli(args, cli_context: CliContext) -> bool:
     docker_client = docker.from_env()
 
-    next_host = host_generator(args.ip if args.ip else ["0.0.0.0"])
+    arg_hosts = args.ip if args.ip else ["0.0.0.0"]
+    arg_networks = args.network if args.network else [DEPLOY_NETWORK]
+
+    if len(arg_networks) > len(arg_hosts):
+        print_errors(
+            prefix=[],
+            errors=[DeployError(context="Networks", msg="do not have enough hosts")],
+            console=cli_context.console
+        )
+        return False
 
     is_ok = True
-    arg_networks = args.network if args.network else [DEPLOY_NETWORK]
-    for arg_network in arg_networks:
+    for arg_host, arg_network in zip(arg_hosts, arg_networks):
         network = get_create_network(docker_client, arg_network)
         if network is None:
             print_errors(
-                arg_network, [DeployError(context=arg_network, msg="not started")]
+                prefix=[arg_network],
+                errors=[DeployError(context=arg_network, msg="not started")],
+                console=cli_context.console
             )
             continue
 
@@ -116,7 +117,7 @@ def cli(args, cli_context: CliContext) -> bool:
             skip_inactive=False,
             network=network,
             docker_client=docker_client,
-            host_generator=next_host,
+            host=arg_host,
             port=args.port,
         )
 

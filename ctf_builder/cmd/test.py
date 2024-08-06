@@ -11,7 +11,7 @@ import docker
 from ..build import BuildTester, BuildDeployer, TestContext, DeployContext
 from ..build.utils import to_docker_tag
 from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
-from ..error import LibError, TestError
+from ..error import LibError, DeployError
 from ..schema import Track
 
 from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliContext
@@ -23,7 +23,7 @@ class Context(WrapContext):
 
 
 def test(track: Track, context: Context) -> typing.Sequence[LibError]:
-    network_name = to_docker_tag(f"ctf-builder_{track.name}_test")
+    network_name = to_docker_tag(f"ctf-builder_test_{track.tag or track.name}")
     if context.docker_client:
         network = get_create_network(context.docker_client, network_name)
     else:
@@ -35,10 +35,10 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         if network:
             for i, deployer in enumerate(track.deploy):
                 deployer_context = DeployContext(
-                    name=f"{network_name}_{i}",
+                    name=f"host_{i}",
                     path=context.challenge_path,
                     docker_client=context.docker_client,
-                    network=network.id,
+                    network=network.name,
                     host=None,
                 )
 
@@ -53,7 +53,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         for i in range(DEPLOY_ATTEMPTS):
             is_ok = True
             for deployer, deployer_context in running_deployers:
-                if not BuildDeployer.get(deployer).is_active(
+                if not BuildDeployer.get(deployer).is_healthy(
                     deployer=deployer, context=deployer_context
                 ):
                     is_ok = False
@@ -63,7 +63,13 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
 
             time.sleep(DEPLOY_SLEEP)
         else:
-            return errors + [TestError("deployment did not start")]
+            errors.append(
+                DeployError(
+                    context="Deployments",
+                    msg="did not start successfully"
+                )
+            )
+            return errors
 
         for tester in track.test:
             errors += BuildTester.get(tester).build(
@@ -79,8 +85,8 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     finally:
         for deployer, deployer_context in running_deployers:
             try:
-                BuildDeployer.get(deployer).stop(
-                    deployer=deployer, context=deployer_context
+                errors += BuildDeployer.get(deployer).stop(
+                    deployer=deployer, context=deployer_context, skip_not_found=False
                 )
             except:
                 pass
