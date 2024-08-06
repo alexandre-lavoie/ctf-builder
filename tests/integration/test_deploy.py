@@ -40,7 +40,13 @@ def test():
             ),
         )
     finally:
-        assert stop_cli(
-            cli_context=context,
-            args=StopArgs(challenge=TEST_CHALLENGES, network=[network]),
-        )
+        try:
+            assert stop_cli(
+                cli_context=context,
+                args=StopArgs(challenge=TEST_CHALLENGES, network=[network]),
+            )
+        finally:
+            try:
+                context.docker_client.api.remove_network(network)
+            except:
+                pass
