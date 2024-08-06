@@ -25,9 +25,9 @@ from ..common import (
 @dataclasses.dataclass(frozen=True)
 class Args:
     api_key: str
-    url: str
-    port: int
-    challenge: typing.Sequence[str]
+    url: str = dataclasses.field(default="http://localhost:8000")
+    port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

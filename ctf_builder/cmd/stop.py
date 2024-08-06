@@ -17,8 +17,8 @@ from .common import WrapContext, get_network, cli_challenge_wrapper, CliContext
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
-    network: typing.Sequence[str]
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    network: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

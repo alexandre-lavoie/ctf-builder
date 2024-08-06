@@ -6,3 +6,5 @@ CHALLENGE_HOST = "localhost"
 DEPLOY_NETWORK = "ctf-builder"
 DEPLOY_ATTEMPTS = 30
 DEPLOY_SLEEP = 1
+
+NULL_VALUES = set([None, "", "none", "None"])

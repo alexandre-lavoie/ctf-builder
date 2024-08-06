@@ -19,7 +19,7 @@ from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliC
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -117,7 +117,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
         error_prefix=[],

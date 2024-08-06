@@ -15,10 +15,10 @@ from ..common import CliContext
 @dataclasses.dataclass
 class Args:
     password: str
-    url: str
     name: str
     email: str
     file: str
+    url: str = dataclasses.field(default="http://localhost:8000")
 
 
 @dataclasses.dataclass

@@ -14,7 +14,7 @@ ATOM_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    output: str
+    output: typing.Union[str, typing.TextIO] = dataclasses.field(default="schema.json")
 
 
 def is_optional(ptype: typing.Type):
@@ -94,7 +94,12 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
-    with open(args.output, "w") as h:
-        json.dump(document_type(Track), h, indent=2)
+    doc = document_type(Track)
+
+    if isinstance(args.output, str):
+        with open(args.output, "w") as h:
+            json.dump(doc, h, indent=2)
+    else:
+        json.dump(doc, args.output, indent=2)
 
     return True

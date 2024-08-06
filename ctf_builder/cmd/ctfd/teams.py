@@ -15,9 +15,9 @@ from ..common import CliContext
 @dataclasses.dataclass(frozen=True)
 class Args:
     api_key: str
-    url: str
     file: str
     output: str
+    url: str = dataclasses.field(default="http://localhost:8000")
 
 
 @dataclasses.dataclass(frozen=True)

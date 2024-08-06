@@ -2,29 +2,17 @@ import argparse
 import dataclasses
 import typing
 
-from .build import cli as build_cli
-from .build import cli_args as build_args
-
-from .start import cli as start_cli
-from .start import cli_args as start_args
-
-from .stop import cli as stop_cli
-from .stop import cli_args as stop_args
-
-from .schema import cli as schema_cli
-from .schema import cli_args as schema_args
-
-from .test import cli as test_cli
-from .test import cli_args as test_args
-
-from .ctfd.challenges import cli as ctfd_challenges_cli
-from .ctfd.challenges import cli_args as ctfd_challenges_args
-
-from .ctfd.setup import cli as ctfd_setup_cli
-from .ctfd.setup import cli_args as ctfd_setup_args
-
-from .ctfd.teams import cli as ctfd_teams_cli
-from .ctfd.teams import cli_args as ctfd_teams_args
+from .build import cli as build_cli, cli_args as build_args
+from .start import cli as start_cli, cli_args as start_args
+from .stop import cli as stop_cli, cli_args as stop_args
+from .schema import cli as schema_cli, cli_args as schema_args
+from .test import cli as test_cli, cli_args as test_args
+from .ctfd.challenges import (
+    cli as ctfd_challenges_cli,
+    cli_args as ctfd_challenges_args,
+)
+from .ctfd.setup import cli as ctfd_setup_cli, cli_args as ctfd_setup_args
+from .ctfd.teams import cli as ctfd_teams_cli, cli_args as ctfd_teams_args
 
 from .common import CliContext
 

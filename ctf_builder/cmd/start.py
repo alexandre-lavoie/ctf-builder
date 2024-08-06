@@ -9,7 +9,12 @@ import docker
 import docker.models.networks
 
 from ..build import DeployContext, BuildDeployer
-from ..config import CHALLENGE_MAX_PORTS, CHALLENGE_BASE_PORT, DEPLOY_NETWORK
+from ..config import (
+    CHALLENGE_MAX_PORTS,
+    CHALLENGE_BASE_PORT,
+    DEPLOY_NETWORK,
+    NULL_VALUES,
+)
 from ..error import DeployError, SkipError, LibError, print_errors
 from ..schema import Track
 
@@ -25,17 +30,18 @@ from .common import (
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
-    ip: typing.Sequence[str]
-    network: typing.Sequence[str]
-    port: int
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    ip: typing.Sequence[typing.Optional[str]] = dataclasses.field(default_factory=list)
+    network: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
+    detach: bool = dataclasses.field(default=False)
 
 
 @dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     network: docker.models.networks.Network
-    host: str
     port: int
+    host: typing.Optional[str] = dataclasses.field(default=None)
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
         default=None
     )
@@ -92,6 +98,13 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
         help="Starting port for challenges",
         default=CHALLENGE_BASE_PORT,
     )
+    parser.add_argument(
+        "-d",
+        "--detach",
+        action="store_true",
+        help="Do not attach ports to hosts",
+        default=False,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
@@ -106,8 +119,12 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         )
         return False
 
+    arg_optional_hosts: typing.Sequence[typing.Optional[str]] = [
+        host if host not in NULL_VALUES else None for host in arg_hosts
+    ]
+
     is_ok = True
-    for arg_host, arg_network in zip(arg_hosts, arg_networks):
+    for arg_host, arg_network in zip(arg_optional_hosts, arg_networks):
         network = get_create_network(cli_context.docker_client, arg_network)
         if network is None:
             print_errors(
