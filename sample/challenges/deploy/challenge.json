@@ -1,5 +1,5 @@
 {
-  "$schema": "../../schema.json",
+  "$schema": "../../doc/challenge.json",
   "name": "Deploy",
   "active": true,
   "challenges": [
@@ -78,7 +78,6 @@
       "healthcheck": {
         "test": "netstat -ltn | grep -c 9001",
         "retries": 3,
-        "start_period": 0,
         "interval": 0.5,
         "timeout": 1.5
       }

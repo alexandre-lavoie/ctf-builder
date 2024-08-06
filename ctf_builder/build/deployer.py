@@ -38,12 +38,17 @@ class DeployContext:
 
 class BuildDeployer(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer"]:
+    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
     def ports(cls, deployer: T) -> typing.Sequence[typing.Tuple[PortProtocol, int]]:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def has_healthcheck(cls, context: DeployContext, deployer: T) -> bool:
         pass
 
     @classmethod
@@ -85,6 +90,10 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
         return [(port.protocol, port.port) for port in deployer.ports]
 
     @classmethod
+    def has_healthcheck(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
+        return deployer.healthcheck is not None
+
+    @classmethod
     def is_healthy(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
         if context.docker_client is None:
             return False
@@ -96,10 +105,10 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
         except:
             return False
 
-        return container.status == "running" and container.health in (
-            "unknown",
-            "healthy",
-        )
+        status: str = container.status
+        health: str = container.health
+
+        return status == "running" and health == "healthy"
 
     @classmethod
     def start(

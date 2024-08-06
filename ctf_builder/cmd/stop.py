@@ -7,18 +7,17 @@ import typing
 import docker
 import docker.models.networks
 
-from ..build import DeployContext, BuildDeployer
+from ..build.deployer import BuildDeployer, DeployContext
 from ..config import DEPLOY_NETWORK
-from ..error import DeployError, SkipError, LibError, print_errors
+from ..error import DeployError, LibError, SkipError, print_errors
 from ..schema import Track
-
-from .common import WrapContext, get_network, cli_challenge_wrapper, CliContext
+from .common import CliContext, WrapContext, cli_challenge_wrapper, get_network
 
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
-    network: typing.Sequence[str]
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    network: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,7 +47,7 @@ def stop(track: Track, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]

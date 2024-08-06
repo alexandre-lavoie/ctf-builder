@@ -4,13 +4,15 @@ import enum
 import os
 import typing
 
+from .config import COMMENT_FIELD_NAME
+
 
 def _meta_comment(comment: str) -> typing.Dict[str, str]:
     """
     Applies a comment to dataclasses.field to be used in documentation.
     """
 
-    return {"comment": comment}
+    return {COMMENT_FIELD_NAME: comment}
 
 
 @dataclasses.dataclass(frozen=True)

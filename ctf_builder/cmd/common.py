@@ -9,14 +9,14 @@ import typing
 import docker
 import docker.errors
 import docker.models.networks
-
 import rich.console
 import rich.progress
 
 from ..config import CHALLENGE_MAX_PORTS
-from ..error import BuildError, LibError, SkipError, print_errors, get_exit_status
+from ..error import BuildError, LibError, SkipError, get_exit_status, print_errors
 from ..parse import parse_track
-from ..schema import Track, PortProtocol
+from ..schema import PortProtocol, Track
+
 
 MAX_TCP_PORT = 65_535
 
@@ -52,19 +52,6 @@ def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, No
         yield None
 
 
-def get_network(
-    client: docker.DockerClient, name: typing.Optional[str] = None
-) -> typing.Optional[docker.models.networks.Network]:
-    try:
-        return client.networks.get(name)
-    except docker.errors.NotFound:
-        pass
-    except docker.errors.APIError:
-        pass
-
-    return None
-
-
 def build_connection_string(
     host: str, port: int, protocol: PortProtocol, path: typing.Optional[str] = None
 ) -> str:
@@ -80,6 +67,28 @@ def build_connection_string(
     assert False, f"unhandled {protocol}"
 
 
+def get_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
+    try:
+        return client.networks.get(name)
+    except docker.errors.NotFound:
+        pass
+    except docker.errors.APIError:
+        pass
+
+    return None
+
+
+def create_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
+    try:
+        return client.networks.create(name, driver="bridge")
+    except docker.errors.APIError:
+        return None
+
+
 def get_create_network(
     client: docker.DockerClient, name: typing.Optional[str] = None
 ) -> typing.Optional[docker.models.networks.Network]:
@@ -87,29 +96,24 @@ def get_create_network(
     if network is not None:
         return network
 
-    try:
-        return client.networks.create(name, driver="bridge")
-    except docker.errors.APIError:
-        pass
-
-    return None
+    return create_network(client, name)
 
 
-def get_challenges(root_directory: str) -> typing.Sequence[str]:
+def get_challenges(root_directory: str) -> typing.Optional[typing.Sequence[str]]:
     if not os.path.isdir(root_directory):
         return []
 
-    out = []
-    for file in glob.glob("**/challenge.json", root_dir=root_directory, recursive=True):
-        path = os.path.join(root_directory, file)
-        name = os.path.basename(os.path.dirname(path))
-        out.append(name)
+    challenge_directory = os.path.join(root_directory, "challenges")
+    if not os.path.isdir(challenge_directory):
+        return None
 
-    return out
+    return [name for name in glob.glob("*", root_dir=challenge_directory)]
 
 
 def get_challenge_index(challenge_path: str) -> int:
     challenges = get_challenges(os.path.dirname(os.path.dirname(challenge_path)))
+    assert challenges is not None
+
     return challenges.index(os.path.basename(challenge_path))
 
 
@@ -167,7 +171,23 @@ def cli_challenge_wrapper(
     console: typing.Optional[rich.console.Console] = None,
 ) -> bool:
     if not challenges:
-        challenges = get_challenges(root_directory)
+        next_challenges = get_challenges(root_directory)
+        if next_challenges is None:
+            print_errors(
+                console=console,
+                errors=[
+                    BuildError(
+                        context="Respository",
+                        msg="does not contain a challenges folder",
+                    )
+                ],
+            )
+            if console:
+                console.print()
+
+            return False
+
+        challenges = next_challenges
 
     skip_inactive = True if len(challenges) <= 1 else False
 

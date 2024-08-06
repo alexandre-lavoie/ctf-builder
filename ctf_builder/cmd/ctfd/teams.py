@@ -5,25 +5,22 @@ import os.path
 import typing
 import uuid
 
-import requests
-
-from ...error import LibError, DeployError, print_errors, get_exit_status
-
+from ...ctfd import CTFdAPI
+from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 
 @dataclasses.dataclass(frozen=True)
 class Args:
     api_key: str
-    url: str
     file: str
-    output: str
+    output: typing.Union[str, typing.TextIO]
+    url: str = dataclasses.field(default="http://localhost:8000")
 
 
 @dataclasses.dataclass(frozen=True)
 class Context:
-    api_key: str
-    url: str
+    session: CTFdAPI
 
 
 @dataclasses.dataclass
@@ -38,7 +35,7 @@ class User:
     verified: bool = dataclasses.field(default=True)
 
     @classmethod
-    def from_dict(cls, data: typing.Dict) -> "User":
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "User":
         fields = {}
 
         for field in dataclasses.fields(cls):
@@ -50,14 +47,14 @@ class User:
 
         return cls(**fields)
 
-    def to_api(self) -> typing.Dict:
+    def to_api(self) -> typing.Dict[str, typing.Any]:
         d = self.to_dict()
 
         del d["id"]
 
         return d
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(User):
@@ -77,7 +74,7 @@ class Team:
     users: typing.Sequence[User] = dataclasses.field(default_factory=list)
 
     @classmethod
-    def from_dict(cls, data: typing.Dict) -> "Team":
+    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "Team":
         fields = {}
 
         for field in dataclasses.fields(cls):
@@ -91,7 +88,7 @@ class Team:
 
         return cls(**fields)
 
-    def to_api(self) -> typing.Dict:
+    def to_api(self) -> typing.Dict[str, typing.Any]:
         d = self.to_dict()
 
         del d["id"]
@@ -99,7 +96,7 @@ class Team:
 
         return d
 
-    def to_dict(self) -> typing.Dict:
+    def to_dict(self) -> typing.Dict[str, typing.Any]:
         out = {}
 
         for field in dataclasses.fields(Team):
@@ -118,10 +115,9 @@ def make_teams(file: str) -> typing.List[Team]:
 
 
 def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/users",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json=user.to_api(),
+    res = context.session.post(
+        "/users",
+        user.to_api(),
     )
 
     if res.status_code != 200:
@@ -142,10 +138,9 @@ def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
 def add_user_to_team(
     team_id: int, user_id: int, context: Context
 ) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/teams/{team_id}/members",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json={"user_id": user_id},
+    res = context.session.post(
+        f"/teams/{team_id}/members",
+        {"user_id": user_id},
     )
 
     if res.status_code != 200:
@@ -161,10 +156,9 @@ def add_user_to_team(
 
 
 def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/teams",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json=team.to_api(),
+    res = context.session.post(
+        "/teams",
+        team.to_api(),
     )
 
     if res.status_code != 200:
@@ -193,7 +187,7 @@ def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument("-k", "--api_key", help="API Key", required=True)
     parser.add_argument(
         "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
@@ -215,11 +209,11 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
-    context = Context(api_key=args.api_key, url=args.url)
+    context = Context(session=CTFdAPI(args.url, args.api_key))
 
     all_errors: typing.List[LibError] = []
 
-    out: typing.List[Team] = []
+    out_teams: typing.List[Team] = []
     for team in teams:
         errors = deploy_team(team, context)
         all_errors += errors
@@ -231,12 +225,16 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         )
 
         if not errors:
-            out.append(team)
+            out_teams.append(team)
 
     if cli_context.console:
         cli_context.console.print()
 
-    with open(args.output, "w") as h:
-        json.dump([team.to_dict() for team in out], h, indent=2)
+    out_json = [team.to_dict() for team in out_teams]
+    if isinstance(args.output, str):
+        with open(args.output, "w") as h:
+            json.dump(out_json, h, indent=2)
+    else:
+        json.dump(out_json, args.output, indent=2)
 
     return get_exit_status(all_errors)

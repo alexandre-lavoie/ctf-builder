@@ -3,8 +3,10 @@ import dataclasses
 import enum
 import typing
 
+from .config import CLASS_TYPE_COMMENT, CLASS_TYPE_FIELD, COMMENT_FIELD_NAME
 from .error import ParseError
-from .schema import Track, Path
+from .schema import Path, Track
+
 
 SUBCLASS = typing.TypeVar("SUBCLASS")
 ATOM_TYPES = (str, int, float, bool)
@@ -22,7 +24,7 @@ def __get_subclass_from_name(
     return None
 
 
-def __get_subclass_names(target: typing.Type) -> typing.List[str]:
+def __get_subclass_names(target: typing.Type[typing.Any]) -> typing.List[str]:
     self_name = target.__name__
 
     names = []
@@ -32,7 +34,7 @@ def __get_subclass_names(target: typing.Type) -> typing.List[str]:
     return names
 
 
-def __expected(ptype: typing.Type) -> typing.List[str]:
+def __expected(ptype: typing.Type[typing.Any]) -> typing.List[str]:
     if ptype in ATOM_TYPES:
         return [ptype.__name__]
     elif typing.get_origin(ptype) == list:
@@ -46,14 +48,19 @@ def __expected(ptype: typing.Type) -> typing.List[str]:
 
 
 def __parse_type(
-    ptype: typing.Any, data: typing.Any, key_path: str = ""
+    ptype: typing.Any,
+    data: typing.Any,
+    key_path: str = "",
+    comment: typing.Optional[str] = None,
 ) -> typing.Tuple[typing.Optional[typing.Any], typing.Sequence[ParseError]]:
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)
 
     if origin == typing.Union and len(args) == 2 and args[1] == type(None):
         # typing.Optional[...]
-        return __parse_type(args[0], data, key_path)
+        return __parse_type(
+            ptype=args[0], data=data, key_path=key_path, comment=comment
+        )
 
     errors: typing.List[ParseError] = []
     if origin == dict:
@@ -61,114 +68,134 @@ def __parse_type(
 
         assert args[0] == str, "Only str keys are supported"
 
-        if not isinstance(data, dict):
-            return None, [ParseError(key_path, __expected(ptype))]
+        if isinstance(data, dict):
+            dict_output: typing.Dict[str, typing.Any] = {}
+            for k, v in data.items():
+                if not isinstance(k, str):
+                    continue
 
-        dict_output: typing.Dict[str, typing.Any] = {}
-        for k, v in data.items():
-            if not isinstance(k, str):
-                continue
+                d, err = __parse_type(args[1], v, f"{key_path}.{k}")
 
-            d, err = __parse_type(args[1], v, f"{key_path}.{k}")
+                if err:
+                    errors += err
+                else:
+                    dict_output[k] = d
 
-            if err:
-                errors += err
-            else:
-                dict_output[k] = d
+            return dict_output, errors
 
-        return dict_output, errors
     elif origin == list:
         # typing.List[...]
 
-        if not isinstance(data, list):
-            return None, [ParseError(key_path, __expected(ptype))]
+        if isinstance(data, list):
+            list_output = []
+            for i, v in enumerate(data):
+                d, err = __parse_type(args[0], v, f"{key_path}.{i}")
 
-        list_output = []
-        for i, v in enumerate(data):
-            d, err = __parse_type(args[0], v, f"{key_path}.{i}")
+                if err:
+                    errors += err
+                else:
+                    list_output.append(d)
 
-            if err:
-                errors += err
-            else:
-                list_output.append(d)
+            return list_output, errors
 
-        return list_output, errors
     elif ptype == float:
+        # float
+
         if isinstance(data, float):
             return data, []
         elif isinstance(data, int):
             return float(data), []
-        else:
-            return None, [ParseError(key_path, __expected(ptype))]
+
     elif ptype in ATOM_TYPES:
-        if not isinstance(data, ptype):
-            return None, [ParseError(key_path, __expected(ptype))]
+        # str, int, bool
 
-        return data, []
+        if isinstance(data, ptype):
+            return data, []
+
     elif ptype.__base__ == Path:
-        if not isinstance(data, str):
-            return None, [ParseError(key_path, __expected(ptype))]
+        # Path subclass
 
-        return ptype(data), []
+        if isinstance(data, str):
+            return ptype(data), []
+
     elif ptype.__base__ == enum.Enum:
+        # enum.Enum subclass
+
         try:
             return ptype(data), []
         except ValueError:
-            return None, [ParseError(key_path, __expected(ptype))]
+            pass
+
     elif dataclasses.is_dataclass(ptype):
-        if not isinstance(data, dict):
-            return None, [ParseError(key_path, __expected(ptype))]
+        # dataclasses.dataclass
 
-        if ptype.__base__ == abc.ABC:
-            tname = data.get("$type")
-            if not isinstance(tname, str):
-                return None, [ParseError(f"{key_path}.$type", __expected(str))]
-
-            parent = ptype
-
-            next_ptype = __get_subclass_from_name(ptype, tname)
-            if next_ptype is None:
-                return None, [
-                    ParseError(f"{key_path}.$type", __get_subclass_names(parent))
-                ]
-            ptype = next_ptype
-
-        type_fields = {}
-        for data_field in dataclasses.fields(ptype):
-            value = data.get(data_field.name)
-            if value is None:
-                if not isinstance(data_field.default, dataclasses._MISSING_TYPE):
-                    d, err = data_field.default, []
-                elif not isinstance(
-                    data_field.default_factory, dataclasses._MISSING_TYPE
-                ):
-                    d, err = data_field.default_factory(), []
-                else:
-                    d, err = None, [
+        if isinstance(data, dict):
+            if ptype.__base__ == abc.ABC:
+                tname = data.get(CLASS_TYPE_FIELD)
+                if not isinstance(tname, str):
+                    return None, [
                         ParseError(
-                            f"{key_path}.{data_field.name}", __expected(data_field.type)
+                            path=f"{key_path}.{CLASS_TYPE_FIELD}",
+                            expected=__expected(str),
+                            comment=CLASS_TYPE_COMMENT,
                         )
                     ]
-            else:
-                d, err = __parse_type(
-                    data_field.type, value, f"{key_path}.{data_field.name}"
-                )
 
-            if err:
-                errors += err
-            else:
-                type_fields[data_field.name] = d
+                parent = ptype
 
-        if errors:
-            return None, errors
+                next_ptype = __get_subclass_from_name(ptype, tname)
+                if next_ptype is None:
+                    return None, [
+                        ParseError(
+                            path=f"{key_path}.{CLASS_TYPE_FIELD}",
+                            expected=__get_subclass_names(parent),
+                            comment=CLASS_TYPE_COMMENT,
+                        )
+                    ]
+                ptype = next_ptype
 
-        return ptype(**type_fields), []
+            type_fields = {}
+            for data_field in dataclasses.fields(ptype):
+                if data_field.name in data:
+                    d, err = __parse_type(
+                        ptype=data_field.type,
+                        data=data[data_field.name],
+                        key_path=f"{key_path}.{data_field.name}",
+                        comment=data_field.metadata.get(COMMENT_FIELD_NAME),
+                    )
+                elif isinstance(
+                    data_field.default, dataclasses._MISSING_TYPE
+                ) and isinstance(data_field.default_factory, dataclasses._MISSING_TYPE):
+                    d, err = None, [
+                        ParseError(
+                            path=f"{key_path}.{data_field.name}",
+                            expected=__expected(data_field.type),
+                            comment=comment,
+                        )
+                    ]
+                else:
+                    continue
+
+                if err:
+                    errors += err
+                else:
+                    type_fields[data_field.name] = d
+
+            if errors:
+                return None, errors
+
+            return ptype(**type_fields), []
+
     else:
         assert False, f"unsupported {ptype}"
 
+    return None, [
+        ParseError(path=key_path, expected=__expected(ptype), comment=comment)
+    ]
+
 
 def parse_track(
-    data: typing.Dict,
+    data: typing.Dict[str, typing.Any],
 ) -> typing.Tuple[typing.Optional[Track], typing.Sequence[ParseError]]:
     if data is None:
         return None, [ParseError("", __expected(Track))]

@@ -1,24 +1,23 @@
 import argparse
 import dataclasses
-import os.path
 import json
-import re
+import os.path
 import typing
 
 import requests
 
-from ...error import LibError, DeployError, print_errors, get_exit_status
-
+from ...ctfd import read_nonce
+from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 
 @dataclasses.dataclass
 class Args:
-    password: str
-    url: str
     name: str
     email: str
+    password: str
     file: str
+    url: str = dataclasses.field(default="http://localhost:8000")
 
 
 @dataclasses.dataclass
@@ -122,17 +121,6 @@ class Setup:
         return {"data": self.data.to_dict(), "files": self.files.to_dict()}
 
 
-NONCE_RE = re.compile(r"<input id=\"nonce\".+?value=\"(.+?)\">")
-
-
-def read_nonce(sess: requests.Session, url: str) -> str:
-    res = sess.get(f"{url}/setup")
-
-    match = NONCE_RE.findall(res.text)
-
-    return match[0] if match else None
-
-
 def make_setup(file: str, name: str, email: str, password: str) -> Setup:
     with open(file, "r") as h:
         config = json.load(h)
@@ -151,9 +139,9 @@ def setup(context: Context) -> typing.Sequence[LibError]:
 
     sess = requests.Session()
 
-    nonce = read_nonce(sess, context.url)
-    if nonce is None:
+    if (nonce := read_nonce(sess, f"{context.url}/setup")) is None:
         return [DeployError(context="nonce", msg="failed to get")]
+
     setup.data.nonce = nonce
 
     res = sess.post(f"{context.url}/setup", **setup.to_dict())
@@ -163,14 +151,14 @@ def setup(context: Context) -> typing.Sequence[LibError]:
             DeployError(
                 context="setup",
                 msg="failed to deploy",
-                error=ValueError(res["message"]),
+                error=ValueError(res.json()["message"]),
             )
         ]
 
     return []
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument(
         "-p", "--password", help="Admin account password", required=True
     )

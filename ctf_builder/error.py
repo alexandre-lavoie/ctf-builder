@@ -3,8 +3,8 @@ import dataclasses
 import datetime
 import typing
 
-import rich.console
 import rich.columns
+import rich.console
 import rich.markup
 import rich.panel
 import rich.text
@@ -42,6 +42,7 @@ class TestError(LibError):
 class ParseError(LibError):
     path: str
     expected: typing.List[str]
+    comment: typing.Optional[str]
 
 
 @dataclasses.dataclass
@@ -109,9 +110,15 @@ def print_errors(
 
     for error in errors:
         if isinstance(error, ParseError):
-            parse_tree.add(
-                f"[red]{rich.markup.escape(error.path)}[/] is not {", ".join('[blue]' + v + '[/]' for v in error.expected)}"
-            )
+            path = rich.markup.escape(error.path)
+            expected = ", ".join(f"[blue]{v}[/]" for v in error.expected)
+
+            if error.comment:
+                comment = f" [bright_black]({rich.markup.escape(error.comment)})[/]"
+            else:
+                comment = ""
+
+            parse_tree.add(f"[red]{path}[/] is not {expected}{comment}")
         elif isinstance(error, (BuildError, DeployError)):
             if isinstance(error, DeployError):
                 target_tree = deploy_tree

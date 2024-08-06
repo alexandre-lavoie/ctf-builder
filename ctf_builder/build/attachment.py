@@ -15,7 +15,7 @@ T = typing.TypeVar("T", bound=Attachment)
 
 class BuildAttachment(typing.Generic[T], abc.ABC):
     @classmethod
-    def get(cls, obj: Attachment) -> typing.Type["BuildAttachment"]:
+    def get(cls, obj: Attachment) -> typing.Type["BuildAttachment[typing.Any]"]:
         return subclass_get(cls, obj)
 
     @classmethod

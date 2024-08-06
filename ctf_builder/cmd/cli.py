@@ -4,29 +4,23 @@ import typing
 
 from .build import cli as build_cli
 from .build import cli_args as build_args
-
-from .start import cli as start_cli
-from .start import cli_args as start_args
-
-from .stop import cli as stop_cli
-from .stop import cli_args as stop_args
-
-from .schema import cli as schema_cli
-from .schema import cli_args as schema_args
-
-from .test import cli as test_cli
-from .test import cli_args as test_args
-
+from .common import CliContext
 from .ctfd.challenges import cli as ctfd_challenges_cli
 from .ctfd.challenges import cli_args as ctfd_challenges_args
-
 from .ctfd.setup import cli as ctfd_setup_cli
 from .ctfd.setup import cli_args as ctfd_setup_args
-
 from .ctfd.teams import cli as ctfd_teams_cli
 from .ctfd.teams import cli_args as ctfd_teams_args
-
-from .common import CliContext
+from .documentation import cli as documentation_cli
+from .documentation import cli_args as documentation_args
+from .schema import cli as schema_cli
+from .schema import cli_args as schema_args
+from .start import cli as start_cli
+from .start import cli_args as start_args
+from .stop import cli as stop_cli
+from .stop import cli_args as stop_args
+from .test import cli as test_cli
+from .test import cli_args as test_args
 
 
 @dataclasses.dataclass
@@ -48,9 +42,14 @@ CLI = Menu(
     help="Main",
     options={
         "build": Command(help="Build static files", args=build_args, cli=build_cli),
+        "doc": Command(
+            help="Build JSON schemas", args=documentation_args, cli=documentation_cli
+        ),
         "start": Command(help="Start challenges", args=start_args, cli=start_cli),
         "stop": Command(help="Stop challenges", args=stop_args, cli=stop_cli),
-        "schema": Command(help="Build JSON schemas", args=schema_args, cli=schema_cli),
+        "schema": Command(
+            help="Validate challenge.json", args=schema_args, cli=schema_cli
+        ),
         "test": Command(help="Test challenges", args=test_args, cli=test_cli),
         "ctfd": Menu(
             help="CTFd integration",

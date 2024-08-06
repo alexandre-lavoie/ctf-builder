@@ -8,18 +8,18 @@ import typing
 
 import docker
 
-from ..build import BuildTester, BuildDeployer, TestContext, DeployContext
+from ..build.deployer import BuildDeployer, DeployContext
+from ..build.tester import BuildTester, TestContext
 from ..build.utils import to_docker_tag
-from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
-from ..error import LibError, DeployError
-from ..schema import Track
-
-from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliContext
+from ..config import DEPLOY_ATTEMPTS, DEPLOY_SLEEP
+from ..error import DeployError, LibError
+from ..schema import Deployer, Track
+from .common import CliContext, WrapContext, cli_challenge_wrapper, create_network
 
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -28,15 +28,21 @@ class Context(WrapContext):
 
 
 def test(track: Track, context: Context) -> typing.Sequence[LibError]:
-    network_name = to_docker_tag(f"ctf-builder_test_{track.tag or track.name}")
-    if context.docker_client:
-        network = get_create_network(context.docker_client, network_name)
+    if context.docker_client is not None:
+        if (
+            network := create_network(
+                context.docker_client,
+                to_docker_tag(f"ctf-builder_test_{track.tag or track.name}"),
+            )
+        ) is None:
+            return [DeployError(context="Network", msg="failed to start")]
     else:
         network = None
 
     errors: typing.List[LibError] = []
-    running_deployers = []
+    running_deployers: typing.List[typing.Tuple[Deployer, DeployContext]] = []
     try:
+        waiting_deployers: typing.List[typing.Tuple[Deployer, DeployContext]] = []
         if network:
             for i, deployer in enumerate(track.deploy):
                 deployer_context = DeployContext(
@@ -47,7 +53,9 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                     host=None,
                 )
 
-                deployer_errors = BuildDeployer.get(deployer).start(
+                builder = BuildDeployer.get(deployer)
+
+                deployer_errors = builder.start(
                     deployer=deployer, context=deployer_context, skip_reuse=False
                 )
                 errors += deployer_errors
@@ -55,16 +63,31 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                 if not deployer_errors:
                     running_deployers.append((deployer, deployer_context))
 
+                    if builder.has_healthcheck(
+                        deployer=deployer, context=deployer_context
+                    ):
+                        waiting_deployers.append((deployer, deployer_context))
+
+        if errors:
+            return errors
+
         for i in range(DEPLOY_ATTEMPTS):
-            is_ok = True
-            for deployer, deployer_context in running_deployers:
-                if not BuildDeployer.get(deployer).is_healthy(
+            waiting_deployers_next: typing.List[
+                typing.Tuple[Deployer, DeployContext]
+            ] = []
+
+            for deployer, deployer_context in waiting_deployers:
+                if BuildDeployer.get(deployer).is_healthy(
                     deployer=deployer, context=deployer_context
                 ):
-                    is_ok = False
+                    continue
 
-            if is_ok:
+                waiting_deployers_next.append((deployer, deployer_context))
+
+            if not waiting_deployers_next:
                 break
+
+            waiting_deployers = waiting_deployers_next
 
             time.sleep(DEPLOY_SLEEP)
         else:
@@ -102,7 +125,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     return errors
 
 
-def cli_args(parser: argparse.ArgumentParser, root_directory: str):
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     challenge_directory = os.path.join(root_directory, "challenges")
 
     challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
@@ -117,7 +140,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
         error_prefix=[],

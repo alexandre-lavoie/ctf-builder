@@ -1,5 +1,7 @@
-import setuptools
 import os.path
+
+import setuptools
+
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(current_directory, "README.md"), encoding="utf-8") as h:
@@ -12,7 +14,7 @@ package_name = "ctf_builder"
 
 setuptools.setup(
     name=package_name,
-    version="0.0.3",
+    version="0.0.4",
     license="MIT",
     author="Alexandre Lavoie",
     author_email="alexandre.lavoie00@gmail.com",

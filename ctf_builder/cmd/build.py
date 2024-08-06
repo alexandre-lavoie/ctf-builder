@@ -7,16 +7,15 @@ import typing
 
 import docker
 
-from ..build import BuildBuilder, BuildContext
+from ..build.builder import BuildBuilder, BuildContext
 from ..error import LibError, SkipError
 from ..schema import Track
-
-from .common import cli_challenge_wrapper, WrapContext, CliContext
+from .common import CliContext, WrapContext, cli_challenge_wrapper
 
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.Sequence[str]
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 @dataclasses.dataclass(frozen=True)

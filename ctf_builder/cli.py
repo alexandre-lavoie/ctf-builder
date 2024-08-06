@@ -2,6 +2,7 @@ import argparse
 import os
 import os.path
 import time
+import typing
 
 import docker
 import rich.console
@@ -11,18 +12,18 @@ from .cmd.common import CliContext
 
 
 def build_command(
-    subparser: argparse._SubParsersAction,
+    subparser: argparse._SubParsersAction[typing.Any],
     name: str,
     command: Command,
     root_directory: str,
-):
+) -> None:
     parser = subparser.add_parser(name=name, help=command.help)
     command.args(parser, root_directory)
 
 
 def build_menu(
     parser: argparse.ArgumentParser, menu: Menu, root_directory: str, depth: int = 0
-):
+) -> None:
     subparser = parser.add_subparsers(dest=f"_{depth}", required=True)
 
     for option_name, option in menu.options.items():
@@ -37,7 +38,9 @@ def build_menu(
             )
 
 
-def run_menu(args, menu: Menu, cli_context: CliContext, depth: int = 0) -> bool:
+def run_menu(
+    args: typing.Any, menu: Menu, cli_context: CliContext, depth: int = 0
+) -> bool:
     target = getattr(args, f"_{depth}")
 
     option = menu.options.get(target)
@@ -86,10 +89,15 @@ def cli() -> int:
     end = time.time()
 
     delta = end - start
+    delta_str = f"{delta:.2f}s"
 
     if is_ok:
-        console.print(f"[bold green]OK[/] in [bold green]{delta:.2f} s[/]")
+        console.print(
+            "[bold green]OK[/]", "in", f"[green]{delta_str}[/]", highlight=False
+        )
     else:
-        console.print(f"[bold red]ERROR[/] in [bold red]{delta:.2f} s[/]")
+        console.print(
+            "[bold red]ERROR[/]", "in", f"[red]{delta_str}[/]", highlight=False
+        )
 
     return 0 if is_ok else 1
