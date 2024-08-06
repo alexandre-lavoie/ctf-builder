@@ -2,6 +2,8 @@
 
 A tool to build, test, and deploy CTFs.
 
+![Preview](.github/images/preview.png)
+
 ## 📥 Installation
 
 ### 📦 Requirements
@@ -84,7 +86,7 @@ Deploys challenges to their containerized environment. This is useful for networ
 
 ### 🔌 Ports
 
-Exposed/public ports (through `"public": true`) **DO NOT** match the host port. This is to prevent collisions between challenges. Each challenge is allocated `5` public ports. These ports are assigned to challenges alphabetically, so if `a` has `1-5` then `b` will `6-10` etc. Integrations will make sure handle this. Ports can also be determined through [Docker](https://docs.docker.com/get-docker/).
+Exposed/public ports **DO NOT** match the host port. This is to prevent collisions between challenges. Each challenge is allocated `5` public ports. These ports are assigned to challenges alphabetically, so if `a` has `1-5` then `b` will `6-10` etc. Integrations will make sure handle this. Ports can also be determined through [Docker](https://docs.docker.com/get-docker/).
 
 ```
 docker container ls
