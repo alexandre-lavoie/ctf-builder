@@ -5,6 +5,7 @@ import enum
 import json
 import typing
 
+from ..config import CLASS_TYPE_COMMENT, COMMENT_FIELD_NAME, CLASS_TYPE_FIELD
 from ..schema import Track, Path
 
 from .common import CliContext
@@ -49,10 +50,10 @@ def document_type(
         for subclass, obj in zip(subclasses, values):
             name = subclass.__name__[len(ptype.__name__) :].lower()
 
-            obj["required"] = ["$type", *obj["required"]]
+            obj["required"] = [CLASS_TYPE_FIELD, *obj["required"]]
             obj["properties"] = {
-                "$type": {
-                    "description": "Class type selector",
+                CLASS_TYPE_FIELD: {
+                    "description": CLASS_TYPE_COMMENT,
                     "type": "string",
                     "enum": [name],
                 },
@@ -78,7 +79,7 @@ def document_type(
                 required.append(field.name)
 
             properties[field.name] = document_type(
-                field.type, field.metadata.get("comment")
+                field.type, field.metadata.get(COMMENT_FIELD_NAME)
             )
 
         out = {"type": "object", "required": required, "properties": properties}

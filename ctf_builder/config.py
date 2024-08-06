@@ -8,3 +8,8 @@ DEPLOY_ATTEMPTS = 30
 DEPLOY_SLEEP = 1
 
 NULL_VALUES = set([None, "", "none", "None"])
+
+CLASS_TYPE_COMMENT = "Object type"
+CLASS_TYPE_FIELD = "$type"
+
+COMMENT_FIELD_NAME = "comment"
