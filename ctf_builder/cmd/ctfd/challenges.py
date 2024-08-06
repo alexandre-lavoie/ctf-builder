@@ -5,10 +5,9 @@ import os
 import os.path
 import typing
 
-import requests
-
 from ...build import BuildTranslation, BuildDeployer, BuildFlag, BuildAttachment
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_MAX_PORTS, CHALLENGE_HOST
+from ...ctfd import CTFdAPI
 from ...error import LibError, BuildError, DeployError
 from ...schema import Track, Translation
 
@@ -32,8 +31,7 @@ class Args:
 
 @dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
-    url: str
-    api_key: str
+    session: CTFdAPI
     port: int
 
 
@@ -144,10 +142,9 @@ def post_create_challenges(
     errors = []
 
     for i, req in enumerate(reqs):
-        res = requests.post(
-            f"{context.url}/api/v1/challenges",
-            headers={"Authorization": f"Token {context.api_key}"},
-            json=dataclasses.asdict(req),
+        res = context.session.post(
+            "/challenges",
+            dataclasses.asdict(req),
         )
 
         if res.status_code != 200:
@@ -203,10 +200,9 @@ def post_create_flags(
     errors = []
 
     for i, req in enumerate(reqs):
-        res = requests.post(
-            f"{context.url}/api/v1/flags",
-            headers={"Authorization": f"Token {context.api_key}"},
-            json=dataclasses.asdict(req),
+        res = context.session.post(
+            "/flags",
+            dataclasses.asdict(req),
         )
 
         if res.status_code != 200:
@@ -243,9 +239,8 @@ def post_attachments(
 
             name, fh = out
 
-            res = requests.post(
-                f"{context.url}/api/v1/files",
-                headers={"Authorization": f"Token {context.api_key}"},
+            res = context.session.post_data(
+                "/files",
                 data={"challenge": id, "type": "challenge"},
                 files={"file": (name, fh)},
             )
@@ -279,10 +274,9 @@ def post_hints(
                 )
                 continue
 
-            res = requests.post(
-                f"{context.url}/api/v1/hints",
-                headers={"Authorization": f"Token {context.api_key}"},
-                json={"challenge_id": id, "content": content, "cost": hint.cost},
+            res = context.session.post(
+                "/hints",
+                {"challenge_id": id, "content": content, "cost": hint.cost},
             )
 
             if res.status_code != 200:
@@ -318,12 +312,9 @@ def patch_references(
             prerequisites.append(ids[offset])
 
         if prerequisites:
-            res = requests.patch(
-                f"{context.url}/api/v1/challenges/{id}",
-                headers={"Authorization": f"Token {context.api_key}"},
-                json={
-                    "requirements": {"anonymize": True, "prerequisites": prerequisites}
-                },
+            res = context.session.patch(
+                f"/challenges/{id}",
+                {"requirements": {"anonymize": True, "prerequisites": prerequisites}},
             )
 
             if res.status_code != 200:
@@ -346,10 +337,9 @@ def patch_references(
                 )
                 continue
 
-            res = requests.patch(
-                f"{context.url}/api/v1/challenges/{id}",
-                headers={"Authorization": f"Token {context.api_key}"},
-                json={"next_id": ids[challenge.next]},
+            res = context.session.patch(
+                f"/challenges/{id}",
+                {"next_id": ids[challenge.next]},
             )
 
             if res.status_code != 200:
@@ -418,8 +408,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         challenge_path="",
         error_prefix=[],
         skip_inactive=False,
-        url=args.url,
-        api_key=args.api_key,
+        session=CTFdAPI(args.url, args.api_key),
         port=args.port,
     )
 

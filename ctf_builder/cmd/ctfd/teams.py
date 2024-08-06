@@ -5,8 +5,7 @@ import os.path
 import typing
 import uuid
 
-import requests
-
+from ...ctfd import CTFdAPI
 from ...error import LibError, DeployError, print_errors, get_exit_status
 
 from ..common import CliContext
@@ -22,8 +21,7 @@ class Args:
 
 @dataclasses.dataclass(frozen=True)
 class Context:
-    api_key: str
-    url: str
+    session: CTFdAPI
 
 
 @dataclasses.dataclass
@@ -118,10 +116,9 @@ def make_teams(file: str) -> typing.List[Team]:
 
 
 def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/users",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json=user.to_api(),
+    res = context.session.post(
+        "/users",
+        user.to_api(),
     )
 
     if res.status_code != 200:
@@ -142,10 +139,9 @@ def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
 def add_user_to_team(
     team_id: int, user_id: int, context: Context
 ) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/teams/{team_id}/members",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json={"user_id": user_id},
+    res = context.session.post(
+        f"/teams/{team_id}/members",
+        {"user_id": user_id},
     )
 
     if res.status_code != 200:
@@ -161,10 +157,9 @@ def add_user_to_team(
 
 
 def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
-    res = requests.post(
-        f"{context.url}/api/v1/teams",
-        headers={"Authorization": f"Token {context.api_key}"},
-        json=team.to_api(),
+    res = context.session.post(
+        "/teams",
+        team.to_api(),
     )
 
     if res.status_code != 200:
@@ -215,7 +210,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
 def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
-    context = Context(api_key=args.api_key, url=args.url)
+    context = Context(session=CTFdAPI(args.url, args.api_key))
 
     all_errors: typing.List[LibError] = []
 
