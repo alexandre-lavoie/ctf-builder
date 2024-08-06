@@ -24,6 +24,14 @@ from .common import (
 
 
 @dataclasses.dataclass(frozen=True)
+class Args:
+    challenge: typing.Sequence[str]
+    ip: typing.Sequence[str]
+    network: typing.Sequence[str]
+    port: int
+
+
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     network: docker.models.networks.Network
     host: str
@@ -86,7 +94,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     arg_hosts = args.ip if args.ip else ["0.0.0.0"]
     arg_networks = args.network if args.network else [DEPLOY_NETWORK]
 

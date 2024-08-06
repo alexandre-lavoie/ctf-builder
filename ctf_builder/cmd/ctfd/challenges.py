@@ -22,19 +22,12 @@ from ..common import (
 )
 
 
-def build_translation(
-    root: str, translations: typing.Sequence[Translation]
-) -> typing.Optional[str]:
-    priority_texts = []
-    for translation in translations:
-        build = BuildTranslation.get(translation)
-
-        if (text := build.build(root, translation)) is None:
-            return None
-
-        priority_texts.append((build.priority(), text))
-
-    return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
+@dataclasses.dataclass(frozen=True)
+class Args:
+    api_key: str
+    url: str
+    port: int
+    challenge: typing.Sequence[str]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -53,6 +46,21 @@ class ChallengeCreateRequest:
     state: str = dataclasses.field(default="visible")
     type: str = dataclasses.field(default="standard")
     connection_info: typing.Optional[str] = dataclasses.field(default=None)
+
+
+def build_translation(
+    root: str, translations: typing.Sequence[Translation]
+) -> typing.Optional[str]:
+    priority_texts = []
+    for translation in translations:
+        build = BuildTranslation.get(translation)
+
+        if (text := build.build(root, translation)) is None:
+            return None
+
+        priority_texts.append((build.priority(), text))
+
+    return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
 
 
 def build_create_challenges(
@@ -405,7 +413,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     context = Context(
         challenge_path="",
         error_prefix=[],

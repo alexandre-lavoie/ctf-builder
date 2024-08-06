@@ -10,6 +10,14 @@ import requests
 from ..common import CliContext
 
 
+@dataclasses.dataclass(frozen=True)
+class Args:
+    api_key: str
+    url: str
+    file: str
+    output: str
+
+
 @dataclasses.dataclass
 class User:
     name: str
@@ -168,10 +176,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
-    out = []
+    out: typing.List[Team] = []
     for team in teams:
         if build_team(args.url, args.api_key, team):
             out.append(team)

@@ -18,6 +18,11 @@ from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliC
 
 
 @dataclasses.dataclass(frozen=True)
+class Args:
+    challenge: typing.Sequence[str]
+
+
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     docker_client: typing.Optional[docker.DockerClient]
 

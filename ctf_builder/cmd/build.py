@@ -16,7 +16,7 @@ from .common import cli_challenge_wrapper, WrapContext, CliContext
 
 @dataclasses.dataclass(frozen=True)
 class Args:
-    challenge: typing.List[str]
+    challenge: typing.Sequence[str]
 
 
 @dataclasses.dataclass(frozen=True)

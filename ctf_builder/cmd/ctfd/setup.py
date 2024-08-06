@@ -11,6 +11,15 @@ from ..common import CliContext
 
 
 @dataclasses.dataclass
+class Args:
+    password: str
+    url: str
+    name: str
+    email: str
+    file: str
+
+
+@dataclasses.dataclass
 class SetupFiles:
     ctf_logo: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
     ctf_banner: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
@@ -160,5 +169,5 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     return build_setup(args.url, args.file, args.name, args.email, args.password)

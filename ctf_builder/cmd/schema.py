@@ -12,6 +12,11 @@ from .common import CliContext
 ATOM_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 
 
+@dataclasses.dataclass(frozen=True)
+class Args:
+    output: str
+
+
 def is_optional(ptype: typing.Type):
     origin = typing.get_origin(ptype)
     args = typing.get_args(ptype)
@@ -88,7 +93,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     parser.add_argument("-o", "--output", help="Output file", default="schema.json")
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     with open(args.output, "w") as h:
         json.dump(document_type(Track), h, indent=2)
 

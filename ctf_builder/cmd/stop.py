@@ -16,6 +16,12 @@ from .common import WrapContext, get_network, cli_challenge_wrapper, CliContext
 
 
 @dataclasses.dataclass(frozen=True)
+class Args:
+    challenge: typing.Sequence[str]
+    network: typing.Sequence[str]
+
+
+@dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
     network: docker.models.networks.Network
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
@@ -60,7 +66,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, cli_context: CliContext) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     is_ok = True
     arg_networks = args.network if args.network else [DEPLOY_NETWORK]
     for arg_network in arg_networks:
@@ -83,7 +89,7 @@ def cli(args, cli_context: CliContext) -> bool:
 
         if not cli_challenge_wrapper(
             root_directory=cli_context.root_directory,
-            challenges=[args.challenge] if args.challenge else None,
+            challenges=args.challenge,
             context=context,
             callback=stop,
             console=cli_context.console,
