@@ -7,8 +7,7 @@ import typing
 
 from ..error import LibError
 from ..schema import Track
-
-from .common import cli_challenge_wrapper, WrapContext, CliContext
+from .common import CliContext, WrapContext, cli_challenge_wrapper
 
 
 @dataclasses.dataclass(frozen=True)

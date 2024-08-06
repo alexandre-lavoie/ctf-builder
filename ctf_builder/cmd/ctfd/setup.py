@@ -1,14 +1,13 @@
 import argparse
 import dataclasses
-import os.path
 import json
+import os.path
 import typing
 
 import requests
 
 from ...ctfd import read_nonce
-from ...error import LibError, DeployError, print_errors, get_exit_status
-
+from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 

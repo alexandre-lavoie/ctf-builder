@@ -3,14 +3,15 @@ import typing
 import uuid
 
 import docker
-
 import rich.console
 
-from ctf_builder.config import CHALLENGE_BASE_PORT
 from ctf_builder.cmd.common import CliContext
+from ctf_builder.cmd.start import Args as StartArgs
+from ctf_builder.cmd.start import cli as start_cli
+from ctf_builder.cmd.stop import Args as StopArgs
+from ctf_builder.cmd.stop import cli as stop_cli
+from ctf_builder.config import CHALLENGE_BASE_PORT
 
-from ctf_builder.cmd.start import cli as start_cli, Args as StartArgs
-from ctf_builder.cmd.stop import cli as stop_cli, Args as StopArgs
 
 TEST_CHALLENGES: typing.List[str] = []
 

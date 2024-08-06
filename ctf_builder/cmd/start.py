@@ -8,23 +8,22 @@ import typing
 import docker
 import docker.models.networks
 
-from ..build.deployer import DeployContext, BuildDeployer
+from ..build.deployer import BuildDeployer, DeployContext
 from ..config import (
-    CHALLENGE_MAX_PORTS,
     CHALLENGE_BASE_PORT,
+    CHALLENGE_MAX_PORTS,
     DEPLOY_NETWORK,
     NULL_VALUES,
 )
-from ..error import DeployError, SkipError, LibError, print_errors
+from ..error import DeployError, LibError, SkipError, print_errors
 from ..schema import Track
-
 from .common import (
-    cli_challenge_wrapper,
-    WrapContext,
-    port_generator,
-    get_create_network,
-    get_challenge_index,
     CliContext,
+    WrapContext,
+    cli_challenge_wrapper,
+    get_challenge_index,
+    get_create_network,
+    port_generator,
 )
 
 

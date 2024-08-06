@@ -3,9 +3,10 @@ import dataclasses
 import enum
 import typing
 
-from .config import CLASS_TYPE_COMMENT, COMMENT_FIELD_NAME, CLASS_TYPE_FIELD
+from .config import CLASS_TYPE_COMMENT, CLASS_TYPE_FIELD, COMMENT_FIELD_NAME
 from .error import ParseError
-from .schema import Track, Path
+from .schema import Path, Track
+
 
 SUBCLASS = typing.TypeVar("SUBCLASS")
 ATOM_TYPES = (str, int, float, bool)

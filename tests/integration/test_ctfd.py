@@ -6,21 +6,19 @@ import typing
 
 import docker
 import docker.models.containers
-
 import rich.console
 
+from ctf_builder.cmd.build import Args as BuildArgs
+from ctf_builder.cmd.build import cli as build_cli
+from ctf_builder.cmd.common import CliContext
+from ctf_builder.cmd.ctfd.challenges import Args as ChallengesArgs
+from ctf_builder.cmd.ctfd.challenges import cli as challenges_cli
+from ctf_builder.cmd.ctfd.setup import Args as SetupArgs
+from ctf_builder.cmd.ctfd.setup import cli as setup_cli
+from ctf_builder.cmd.ctfd.teams import Args as TeamsArgs
+from ctf_builder.cmd.ctfd.teams import cli as teams_cli
 from ctf_builder.config import CHALLENGE_BASE_PORT
 from ctf_builder.ctfd import generate_key
-from ctf_builder.cmd.common import CliContext
-
-from ctf_builder.cmd.build import cli as build_cli, Args as BuildArgs
-
-from ctf_builder.cmd.ctfd.setup import cli as setup_cli, Args as SetupArgs
-from ctf_builder.cmd.ctfd.teams import cli as teams_cli, Args as TeamsArgs
-from ctf_builder.cmd.ctfd.challenges import (
-    cli as challenges_cli,
-    Args as ChallengesArgs,
-)
 
 
 TEST_NAME = "test"

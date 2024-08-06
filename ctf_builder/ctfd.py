@@ -1,8 +1,10 @@
 import dataclasses
 import datetime
 import re
-import requests
 import typing
+
+import requests
+
 
 VERSION = "/api/v1"
 NONCE_RE = re.compile(r"<input id=\"nonce\".+?value=\"(.+?)\">")

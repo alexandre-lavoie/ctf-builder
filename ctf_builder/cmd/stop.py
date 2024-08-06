@@ -7,12 +7,11 @@ import typing
 import docker
 import docker.models.networks
 
-from ..build.deployer import DeployContext, BuildDeployer
+from ..build.deployer import BuildDeployer, DeployContext
 from ..config import DEPLOY_NETWORK
-from ..error import DeployError, SkipError, LibError, print_errors
+from ..error import DeployError, LibError, SkipError, print_errors
 from ..schema import Track
-
-from .common import WrapContext, get_network, cli_challenge_wrapper, CliContext
+from .common import CliContext, WrapContext, cli_challenge_wrapper, get_network
 
 
 @dataclasses.dataclass(frozen=True)

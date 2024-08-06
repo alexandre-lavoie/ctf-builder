@@ -2,12 +2,10 @@ import os.path
 import typing
 
 import docker
-
 import rich.console
 
 from ctf_builder.cmd.common import CliContext
-
-from ctf_builder.cmd.test import cli, Args
+from ctf_builder.cmd.test import Args, cli
 
 
 TEST_CHALLENGES: typing.List[str] = []

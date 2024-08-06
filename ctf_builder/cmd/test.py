@@ -11,12 +11,10 @@ import docker
 from ..build.deployer import BuildDeployer, DeployContext
 from ..build.tester import BuildTester, TestContext
 from ..build.utils import to_docker_tag
-
-from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
-from ..error import LibError, DeployError
-from ..schema import Track, Deployer
-
-from .common import cli_challenge_wrapper, WrapContext, create_network, CliContext
+from ..config import DEPLOY_ATTEMPTS, DEPLOY_SLEEP
+from ..error import DeployError, LibError
+from ..schema import Deployer, Track
+from .common import CliContext, WrapContext, cli_challenge_wrapper, create_network
 
 
 @dataclasses.dataclass(frozen=True)

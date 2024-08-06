@@ -3,8 +3,8 @@ import dataclasses
 import datetime
 import typing
 
-import rich.console
 import rich.columns
+import rich.console
 import rich.markup
 import rich.panel
 import rich.text

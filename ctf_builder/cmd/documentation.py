@@ -7,10 +7,10 @@ import os
 import os.path
 import typing
 
-from ..config import CLASS_TYPE_COMMENT, COMMENT_FIELD_NAME, CLASS_TYPE_FIELD
-from ..schema import Track, Path
-
+from ..config import CLASS_TYPE_COMMENT, CLASS_TYPE_FIELD, COMMENT_FIELD_NAME
+from ..schema import Path, Track
 from .common import CliContext
+
 
 ATOM_TYPES = {str: "string", int: "integer", float: "number", bool: "boolean"}
 

@@ -9,18 +9,16 @@ from ...build.attachment import BuildAttachment
 from ...build.deployer import BuildDeployer
 from ...build.flag import BuildFlag
 from ...build.translation import BuildTranslation
-from ...config import CHALLENGE_BASE_PORT, CHALLENGE_MAX_PORTS, CHALLENGE_HOST
+from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
 from ...ctfd import CTFdAPI
-from ...error import LibError, BuildError, DeployError
+from ...error import BuildError, DeployError, LibError
 from ...schema import Track, Translation
-
-from ..common import CliContext
-
 from ..common import (
+    CliContext,
     WrapContext,
+    build_connection_string,
     cli_challenge_wrapper,
     get_challenge_index,
-    build_connection_string,
 )
 
 

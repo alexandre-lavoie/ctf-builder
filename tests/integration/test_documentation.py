@@ -3,12 +3,10 @@ import os.path
 import tempfile
 
 import docker
-
 import rich.console
 
 from ctf_builder.cmd.common import CliContext
-
-from ctf_builder.cmd.documentation import cli, Args
+from ctf_builder.cmd.documentation import Args, cli
 
 
 def test() -> None:

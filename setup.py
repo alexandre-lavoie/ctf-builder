@@ -1,5 +1,7 @@
-import setuptools
 import os.path
+
+import setuptools
+
 
 current_directory = os.path.dirname(os.path.abspath(__file__))
 with open(os.path.join(current_directory, "README.md"), encoding="utf-8") as h:

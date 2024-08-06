@@ -6,8 +6,7 @@ import typing
 import uuid
 
 from ...ctfd import CTFdAPI
-from ...error import LibError, DeployError, print_errors, get_exit_status
-
+from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 

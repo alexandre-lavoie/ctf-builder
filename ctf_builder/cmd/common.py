@@ -9,14 +9,14 @@ import typing
 import docker
 import docker.errors
 import docker.models.networks
-
 import rich.console
 import rich.progress
 
 from ..config import CHALLENGE_MAX_PORTS
-from ..error import BuildError, LibError, SkipError, print_errors, get_exit_status
+from ..error import BuildError, LibError, SkipError, get_exit_status, print_errors
 from ..parse import parse_track
-from ..schema import Track, PortProtocol
+from ..schema import PortProtocol, Track
+
 
 MAX_TCP_PORT = 65_535
 

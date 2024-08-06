@@ -10,8 +10,7 @@ import docker
 from ..build.builder import BuildBuilder, BuildContext
 from ..error import LibError, SkipError
 from ..schema import Track
-
-from .common import cli_challenge_wrapper, WrapContext, CliContext
+from .common import CliContext, WrapContext, cli_challenge_wrapper
 
 
 @dataclasses.dataclass(frozen=True)
