@@ -8,13 +8,14 @@ import typing
 import docker
 import docker.errors
 
-from ..error import BuildError
-from ..logging import LOG
+from ..error import BuildError, LibError
 from ..schema import Builder, BuilderDocker
 
 from .args import BuildArgs
 from .file_map import BuildFileMap
 from .utils import subclass_get
+
+T = typing.TypeVar("T", bound=Builder)
 
 
 @dataclasses.dataclass
@@ -25,43 +26,33 @@ class BuildContext:
     )
 
 
-class BuildBuilder(abc.ABC):
+class BuildBuilder(typing.Generic[T], abc.ABC):
     @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Builder]:
-        return None
-
-    @classmethod
-    def get(cls, obj: Builder) -> typing.Type["BuildBuilder"]:
+    def get(cls, obj: T) -> typing.Type["BuildBuilder"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
-    def build(
-        cls, context: BuildContext, builder: Builder
-    ) -> typing.Sequence[BuildError]:
-        return []
+    def build(cls, context: BuildContext, builder: T) -> typing.Sequence[LibError]:
+        pass
 
 
-class BuildBuilderDocker(BuildBuilder):
-    @classmethod
-    def __type__(cls) -> typing.Type[Builder]:
-        return BuilderDocker
-
+class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
     @classmethod
     def build(
         cls, context: BuildContext, builder: BuilderDocker
-    ) -> typing.Sequence[BuildError]:
+    ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
-            return [BuildError("No docker client")]
+            return [BuildError(context="Docker", msg="no client initialized")]
 
+        dockerfile: typing.Optional[str]
         if builder.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
             dockerfile = builder.path.resolve(context.path)
 
-        if dockerfile is None or not os.path.exists(dockerfile):
-            return [BuildError("Dockerfile is invalid")]
+        if dockerfile is None or not os.path.isfile(dockerfile):
+            return [BuildError(context="Dockerfile", msg="is not a file")]
 
         dockerfile = os.path.abspath(dockerfile)
 
@@ -69,7 +60,9 @@ class BuildBuilderDocker(BuildBuilder):
         build_args = {}
         for args in builder.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
-                errors.append("invalid build args")
+                errors.append(
+                    BuildError(context="Dockerfile", msg="invalid build args")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -81,27 +74,25 @@ class BuildBuilderDocker(BuildBuilder):
                 dockerfile=dockerfile,
                 buildargs=build_args,
             )
-
-            for log in logs:
-                if "stream" not in log:
-                    continue
-
-                LOG.info(log["stream"].strip())
         except docker.errors.BuildError as e:
-            return errors + [BuildError(f"Dockerfile build failed > {e}")]
+            return errors + [
+                BuildError(context="Dockerfile", msg="failed to build", error=e)
+            ]
 
         try:
             container = context.docker_client.containers.create(image=image)
         except docker.errors.APIError as e:
-            return errors + [BuildError(f"Dockerfile create failed > {e}")]
+            return errors + [
+                BuildError(context="Dockerfile", msg="failed to create", error=e)
+            ]
 
         try:
-            for i, file_map in enumerate(builder.files):
+            for file_map in builder.files:
                 source, destination = BuildFileMap.build(file_map)
                 destination = os.path.join(os.path.abspath(context.path), destination)
 
                 if os.path.isdir(destination):
-                    errors.append(BuildError(f"{i}.destination is a directory"))
+                    errors.append(BuildError(context=destination, msg="is a directory"))
                     continue
 
                 os.makedirs(os.path.dirname(destination), exist_ok=True)
@@ -109,7 +100,9 @@ class BuildBuilderDocker(BuildBuilder):
                 try:
                     res, _ = container.get_archive(source)
                 except docker.errors.NotFound:
-                    errors.append(BuildError(f"file {source} not found in container"))
+                    errors.append(
+                        BuildError(context=source, msg="was not found in container")
+                    )
                     continue
 
                 tar_data = io.BytesIO()
@@ -120,11 +113,22 @@ class BuildBuilderDocker(BuildBuilder):
                 with tarfile.TarFile.open(fileobj=tar_data, mode="r") as th:
                     members = th.getmembers()
                     if len(members) != 1:
-                        errors.append(BuildError("invalid tar file output"))
+                        errors.append(
+                            BuildError(
+                                context=source, msg="is a directory in the container"
+                            )
+                        )
+                        continue
+
+                    extract_file = th.extractfile(members[0])
+                    if extract_file is None:
+                        errors.append(
+                            BuildError(context=source, msg="file cannot be extracted")
+                        )
                         continue
 
                     with open(destination, "wb") as dh:
-                        dh.write(th.extractfile(members[0]).read())
+                        dh.write(extract_file.read())
         finally:
             try:
                 container.remove(force=True)

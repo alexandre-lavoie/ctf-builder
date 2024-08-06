@@ -1,0 +1,93 @@
+{
+  "$schema": "../../schema.json",
+  "name": "Deploy",
+  "active": true,
+  "challenges": [
+    {
+      "category": "Sample",
+      "value": 0,
+      "host": {
+        "index": 0
+      },
+      "descriptions": [
+        {
+          "$type": "english",
+          "path": "text/CHAL-EN.md"
+        },
+        {
+          "$type": "french",
+          "path": "text/CHAL-FR.md"
+        }
+      ],
+      "flags": [
+        {
+          "case_sensitive": true,
+          "regex": false,
+          "values": {
+            "$type": "env",
+            "path": "FLAG",
+            "keys": [
+              "FLAG"
+            ]
+          }
+        }
+      ],
+      "attachments": [
+        {
+          "$type": "directory",
+          "path": "challenge",
+          "name": "source.zip"
+        }
+      ],
+      "hints": [
+        {
+          "cost": 0,
+          "texts": [
+            {
+              "$type": "english",
+              "path": "text/HINT-EN.md"
+            },
+            {
+              "$type": "french",
+              "path": "text/HINT-FR.md"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "deploy": [
+    {
+      "$type": "docker",
+      "path": "challenge/Dockerfile",
+      "ports": [
+        {
+          "port": 9001,
+          "protocol": "tcp"
+        }
+      ],
+      "env": [
+        {
+          "$type": "env",
+          "path": "FLAG",
+          "keys": [
+            "FLAG"
+          ]
+        }
+      ],
+      "healthcheck": {
+        "test": "netstat -ltn | grep -c 9001",
+        "retries": 3,
+        "start_period": 0,
+        "interval": 0.5,
+        "timeout": 1.5
+      }
+    }
+  ],
+  "test": [
+    {
+      "$type": "docker",
+      "path": "Dockerfile.test"
+    }
+  ]
+}

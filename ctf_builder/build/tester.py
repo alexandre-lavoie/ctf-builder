@@ -8,14 +8,16 @@ import docker
 import docker.errors
 import docker.models.containers
 
-from ..error import TestError
-from ..logging import LOG
+from ..error import TestError, BuildError, LibError
 from ..schema import Tester, TesterDocker, Challenge, Deployer
 
 from .args import BuildArgs
 from .deployer import BuildDeployer
 from .flag import BuildFlag
 from .utils import subclass_get
+
+
+T = typing.TypeVar("T", bound=Tester)
 
 
 @dataclasses.dataclass
@@ -29,27 +31,22 @@ class TestContext:
     )
 
 
-class BuildTester(abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Tester]:
-        return None
-
+class BuildTester(typing.Generic[T], abc.ABC):
     @classmethod
     def get(cls, obj: Tester) -> typing.Type["BuildTester"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
-    def build(cls, context: TestContext, tester: Tester) -> typing.Sequence[TestError]:
-        return []
+    def build(cls, context: TestContext, tester: T) -> typing.Sequence[LibError]:
+        pass
 
 
 @dataclasses.dataclass(frozen=True)
 class DockerTestContext:
     docker_client: docker.DockerClient
     image: str
-    network: str
+    network: typing.Optional[str]
     environment: typing.Mapping[str, str]
     challenge_id: int
     challenge_host: typing.Optional[str]
@@ -60,8 +57,7 @@ class DockerTestContext:
 
 
 def docker_test(context: DockerTestContext):
-    is_ok = True
-    error = ""
+    error = None
     try:
         context.docker_client.containers.run(
             image=context.image,
@@ -77,53 +73,58 @@ def docker_test(context: DockerTestContext):
             remove=True,
         )
     except docker.errors.ContainerError as e:
-        is_ok = False
-        error = e.stderr.decode()
-    except Exception as e:
-        is_ok = False
-        error = str(e)
+        stderr: bytes = e.stderr if e.stderr else b""
 
-    if not is_ok:
-        if error.strip():
-            suffix = f" > {error.strip()}"
-        else:
-            suffix = ""
+        fail_offset = stderr.find(b"FAIL: ")
 
-        context.errors.append(
-            TestError(
-                f"failed > challenge {context.challenge_id}, flag '{context.flag}'{suffix}"
+        if fail_offset >= 0:
+            error = TestError(
+                context=f"Challenge {context.challenge_id}",
+                expected=context.flag,
+                actual=stderr[fail_offset + 6 :].decode(),
             )
+        else:
+            error = TestError(
+                context=f"Challenge {context.challenge_id}",
+                expected=context.flag,
+                error=ValueError(stderr.decode()),
+            )
+    except Exception as e:
+        error = TestError(
+            context=f"Challenge {context.challenge_id}", expected=context.flag, error=e
         )
 
+    if error:
+        context.errors.append(error)
 
-class BuildTesterDocker(BuildTester):
-    @classmethod
-    def __type__(cls) -> typing.Type[Tester]:
-        return TesterDocker
 
+class BuildTesterDocker(BuildTester[TesterDocker]):
     @classmethod
     def build(
         cls, context: TestContext, tester: TesterDocker
-    ) -> typing.Sequence[TestError]:
+    ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
-            return [TestError("No docker client")]
+            return [BuildError(context="Docker", msg="no client initialized")]
 
+        dockerfile: typing.Optional[str]
         if tester.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
             dockerfile = tester.path.resolve(context.path)
 
-        if dockerfile is None or not os.path.exists(dockerfile):
-            return [TestError("Dockerfile is invalid")]
+        if dockerfile is None or not os.path.isfile(dockerfile):
+            return [BuildError(context="Dockerfile", msg="is not a file")]
 
         dockerfile = os.path.abspath(dockerfile)
 
-        errors = []
+        errors: typing.List[LibError] = []
 
         build_args = {}
         for args in tester.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
-                errors.append("invalid build args")
+                errors.append(
+                    BuildError(context="Dockerfile", msg="invalid build args")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -132,7 +133,9 @@ class BuildTesterDocker(BuildTester):
         environment = {}
         for env in tester.env:
             if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
-                errors.append("invalid environment")
+                errors.append(
+                    BuildError(context="Dockerfile", msg="invalid environment")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -144,21 +147,21 @@ class BuildTesterDocker(BuildTester):
                 dockerfile=dockerfile,
                 buildargs=build_args,
             )
-
-            for log in logs:
-                if "stream" not in log:
-                    continue
-
-                LOG.info(log["stream"].strip())
         except docker.errors.BuildError as e:
-            return errors + [TestError(f"Dockerfile build failed > {e}")]
+            return errors + [
+                BuildError(context="Dockerfile", msg="failed to build", error=e)
+            ]
 
-        if context.challenges:
+        if tester.challenges:
             challenges = {}
 
             for challenge_id in tester.challenges:
                 if challenge_id < 0 or challenge_id >= len(context.challenges):
-                    errors.append(TestError(f"invalid challenge id"))
+                    errors.append(
+                        BuildError(
+                            context=f"Challenge {challenge_id}", msg="invalid id"
+                        )
+                    )
                     continue
 
                 challenges[challenge_id] = context.challenges[challenge_id]
@@ -176,21 +179,27 @@ class BuildTesterDocker(BuildTester):
                 if challenge.host.index < 0 or challenge.host.index > len(
                     context.deployers
                 ):
-                    errors.append(TestError("invalid challenge host"))
+                    errors.append(
+                        BuildError(
+                            context=f"Challenge {challenge_id}", msg="invalid host"
+                        )
+                    )
                     continue
 
-                challenge_host = f"{context.network}_{challenge.host.index}"
+                challenge_host = f"host_{challenge.host.index}"
 
                 deployer = context.deployers[challenge.host.index]
 
-                for data in BuildDeployer.get(deployer).public_ports(deployer):
-                    if data is None:
-                        continue
+                ports = BuildDeployer.get(deployer).ports(deployer)
+                if not ports:
+                    errors.append(
+                        BuildError(
+                            context=f"Challenge {challenge_id}", msg="no exposed ports"
+                        )
+                    )
+                    continue
 
-                    _, challenge_port = data
-                    break
-                else:
-                    challenge_port = None
+                _, challenge_port = ports[0]
             else:
                 challenge_host = None
                 challenge_port = None

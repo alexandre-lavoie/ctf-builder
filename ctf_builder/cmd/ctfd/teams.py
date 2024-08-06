@@ -7,12 +7,30 @@ import uuid
 
 import requests
 
+from ...error import LibError, DeployError, print_errors, get_exit_status
+
+from ..common import CliContext
+
+
+@dataclasses.dataclass(frozen=True)
+class Args:
+    api_key: str
+    url: str
+    file: str
+    output: str
+
+
+@dataclasses.dataclass(frozen=True)
+class Context:
+    api_key: str
+    url: str
+
 
 @dataclasses.dataclass
 class User:
     name: str
     email: str
-    id: int = dataclasses.field(default=None)
+    id: int = dataclasses.field(default=-1)
     password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     banned: bool = dataclasses.field(default=False)
     hidden: bool = dataclasses.field(default=False)
@@ -52,7 +70,7 @@ class User:
 class Team:
     name: str
     email: str
-    id: int = dataclasses.field(default=None)
+    id: int = dataclasses.field(default=-1)
     password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
     banned: bool = dataclasses.field(default=False)
     hidden: bool = dataclasses.field(default=False)
@@ -99,52 +117,80 @@ def make_teams(file: str) -> typing.List[Team]:
     return [Team.from_dict(team) for team in data["teams"]]
 
 
-def build_user(url: str, api_key: str, user: User) -> bool:
+def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
     res = requests.post(
-        f"{url}/api/v1/users",
-        headers={"Authorization": f"Token {api_key}"},
+        f"{context.url}/api/v1/users",
+        headers={"Authorization": f"Token {context.api_key}"},
         json=user.to_api(),
     )
 
     if res.status_code != 200:
-        return False
+        return [
+            DeployError(
+                context=f"User {user.name}",
+                msg="failed to deploy",
+                error=ValueError(res.json()["message"]),
+            )
+        ]
 
     data = res.json()["data"]
     user.id = data["id"]
 
-    return True
+    return []
 
 
-def add_user_to_team(url: str, api_key: str, team_id: int, user_id: int) -> bool:
+def add_user_to_team(
+    team_id: int, user_id: int, context: Context
+) -> typing.Sequence[LibError]:
     res = requests.post(
-        f"{url}/api/v1/teams/{team_id}/members",
-        headers={"Authorization": f"Token {api_key}"},
+        f"{context.url}/api/v1/teams/{team_id}/members",
+        headers={"Authorization": f"Token {context.api_key}"},
         json={"user_id": user_id},
     )
 
-    return res.status_code == 200
+    if res.status_code != 200:
+        return [
+            DeployError(
+                context=f"User {user_id}",
+                msg="failed to deploy",
+                error=ValueError(res.json()["message"]),
+            )
+        ]
+
+    return []
 
 
-def build_team(url: str, api_key: str, team: Team) -> bool:
+def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
     res = requests.post(
-        f"{url}/api/v1/teams",
-        headers={"Authorization": f"Token {api_key}"},
+        f"{context.url}/api/v1/teams",
+        headers={"Authorization": f"Token {context.api_key}"},
         json=team.to_api(),
     )
 
-    if res.status_code == 200:
-        data = res.json()["data"]
-        team_id = data["id"]
-    else:
-        return False
+    if res.status_code != 200:
+        return [
+            DeployError(
+                context="Team",
+                msg="failed to deploy",
+                error=ValueError(res.json()["message"]),
+            )
+        ]
+
+    data = res.json()["data"]
+    team_id = data["id"]
 
     team.id = team_id
 
+    errors: typing.List[LibError] = []
     for user in team.users:
-        if build_user(url, api_key, user):
-            add_user_to_team(url, api_key, team.id, user.id)
+        user_errors = deploy_user(user, context)
+        if user_errors:
+            errors += user_errors
+            continue
 
-    return True
+        errors += add_user_to_team(team.id, user.id, context)
+
+    return errors
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str):
@@ -166,15 +212,31 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str):
     )
 
 
-def cli(args, root_directory: str) -> bool:
+def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
-    out = []
+    context = Context(api_key=args.api_key, url=args.url)
+
+    all_errors: typing.List[LibError] = []
+
+    out: typing.List[Team] = []
     for team in teams:
-        if build_team(args.url, args.api_key, team):
+        errors = deploy_team(team, context)
+        all_errors += errors
+
+        print_errors(
+            prefix=[team.name],
+            errors=errors,
+            console=cli_context.console,
+        )
+
+        if not errors:
             out.append(team)
+
+    if cli_context.console:
+        cli_context.console.print()
 
     with open(args.output, "w") as h:
         json.dump([team.to_dict() for team in out], h, indent=2)
 
-    return True
+    return get_exit_status(all_errors)

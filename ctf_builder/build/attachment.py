@@ -10,12 +10,10 @@ from ..schema import Attachment, AttachmentFile, AttachmentDirectory
 from .utils import subclass_get
 
 
-class BuildAttachment(abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Attachment]:
-        return None
+T = typing.TypeVar("T", bound=Attachment)
 
+
+class BuildAttachment(typing.Generic[T], abc.ABC):
     @classmethod
     def get(cls, obj: Attachment) -> typing.Type["BuildAttachment"]:
         return subclass_get(cls, obj)
@@ -23,20 +21,16 @@ class BuildAttachment(abc.ABC):
     @classmethod
     @abc.abstractmethod
     def build(
-        cls, root: str, attachment: Attachment
-    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
-        return []
+        cls, root: str, attachment: T
+    ) -> typing.Optional[typing.Tuple[str, typing.BinaryIO]]:
+        pass
 
 
-class BuildAttachmentFile(BuildAttachment):
-    @classmethod
-    def __type__(cls) -> typing.Type[Attachment]:
-        return AttachmentFile
-
+class BuildAttachmentFile(BuildAttachment[AttachmentFile]):
     @classmethod
     def build(
         cls, root: str, file: AttachmentFile
-    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
+    ) -> typing.Optional[typing.Tuple[str, typing.BinaryIO]]:
         path = file.path.resolve(root)
         if path is None:
             return None
@@ -52,15 +46,11 @@ class BuildAttachmentFile(BuildAttachment):
         return name, io.BytesIO(data)
 
 
-class BuildAttachmentDirectory(BuildAttachment):
-    @classmethod
-    def __type__(cls) -> typing.Type[Attachment]:
-        return AttachmentDirectory
-
+class BuildAttachmentDirectory(BuildAttachment[AttachmentDirectory]):
     @classmethod
     def build(
         cls, root: str, directory: AttachmentDirectory
-    ) -> typing.Optional[typing.Tuple[str, io.BytesIO]]:
+    ) -> typing.Optional[typing.Tuple[str, typing.BinaryIO]]:
         path = directory.path.resolve(root)
         if path is None:
             return None

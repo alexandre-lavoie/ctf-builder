@@ -7,15 +7,17 @@ import docker
 import docker.errors
 import docker.types
 
-from ..error import DeployError, LibError, SkipError
-from ..logging import LOG
+from ..error import BuildError, DeployError, LibError, SkipError
 from ..schema import Deployer, DeployerDocker, PortProtocol
 
 from .args import BuildArgs
 from .utils import subclass_get, to_docker_tag
 
 
-def default_port_generator() -> typing.Generator[typing.Optional[str], None, None]:
+T = typing.TypeVar("T", bound=Deployer)
+
+
+def default_port_generator() -> typing.Generator[typing.Optional[int], None, None]:
     while True:
         yield None
 
@@ -29,105 +31,68 @@ class DeployContext:
     )
     network: typing.Optional[str] = dataclasses.field(default=None)
     host: typing.Optional[str] = dataclasses.field(default=None)
-    port_generator: typing.Generator[typing.Optional[str], None, None] = (
+    port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )
 
 
-class BuildDeployer(abc.ABC):
-    @classmethod
-    @abc.abstractmethod
-    def __type__(cls) -> typing.Type[Deployer]:
-        return None
-
+class BuildDeployer(typing.Generic[T], abc.ABC):
     @classmethod
     def get(cls, obj: Deployer) -> typing.Type["BuildDeployer"]:
         return subclass_get(cls, obj)
 
     @classmethod
     @abc.abstractmethod
-    def has_host(cls, deployer: DeployerDocker) -> bool:
-        return False
+    def ports(cls, deployer: T) -> typing.Sequence[typing.Tuple[PortProtocol, int]]:
+        pass
 
     @classmethod
     @abc.abstractmethod
-    def public_ports(
-        cls, deployer: DeployerDocker
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        return []
-
-    @classmethod
-    @abc.abstractmethod
-    def deploy_ports(
-        cls, deployer: DeployerDocker, port: int
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        return []
-
-    @classmethod
-    @abc.abstractmethod
-    def is_active(cls, context: DeployContext, deployer: Deployer) -> bool:
-        return False
+    def is_healthy(cls, context: DeployContext, deployer: T) -> bool:
+        pass
 
     @classmethod
     @abc.abstractmethod
     def start(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: T, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
-        return []
+        pass
 
     @classmethod
     @abc.abstractmethod
     def stop(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: T, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
-        return []
+        pass
 
 
-class BuildDeployerDocker(BuildDeployer):
+class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
     @classmethod
-    def __type__(cls) -> typing.Type[Deployer]:
-        return DeployerDocker
-
-    @classmethod
-    def get_name(cls, context: DeployContext) -> str:
+    def get_dns_name(cls, context: DeployContext) -> str:
         return to_docker_tag(context.name)
 
     @classmethod
-    def has_host(cls, deployer: DeployerDocker) -> bool:
-        return any(port.public for port in deployer.ports)
+    def get_container_name(cls, context: DeployContext) -> str:
+        if context.network:
+            return to_docker_tag(f"{context.network}_{context.name}")
+
+        return cls.get_dns_name(context)
 
     @classmethod
-    def public_ports(
+    def ports(
         cls, deployer: DeployerDocker
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        return [
-            (port.protocol, port.port) if port.public else None
-            for port in deployer.ports
-        ]
+    ) -> typing.Sequence[typing.Tuple[PortProtocol, int]]:
+        return [(port.protocol, port.port) for port in deployer.ports]
 
     @classmethod
-    def deploy_ports(
-        cls, deployer: DeployerDocker, port: int
-    ) -> typing.Sequence[typing.Optional[typing.Tuple[PortProtocol, int]]]:
-        out = []
-        for p in deployer.ports:
-            if p.public:
-                v = port
-                port += 1
-            else:
-                v = None
-
-            out.append((p.protocol, v))
-
-        return out
-
-    @classmethod
-    def is_active(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
+    def is_healthy(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
         if context.docker_client is None:
             return False
 
         try:
-            container = context.docker_client.containers.get(cls.get_name(context))
+            container = context.docker_client.containers.get(
+                cls.get_container_name(context)
+            )
         except:
             return False
 
@@ -138,26 +103,29 @@ class BuildDeployerDocker(BuildDeployer):
 
     @classmethod
     def start(
-        cls, context: DeployContext, deployer: DeployerDocker
+        cls, context: DeployContext, deployer: DeployerDocker, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
-            return [DeployError("No docker client")]
+            return [BuildError(context="Docker", msg="client not initialized")]
 
+        dockerfile: typing.Optional[str]
         if deployer.path is None:
             dockerfile = os.path.join(context.path, "Dockerfile")
         else:
             dockerfile = deployer.path.resolve(context.path)
 
-        if dockerfile is None or not os.path.exists(dockerfile):
-            return [DeployError("Dockerfile is invalid")]
+        if dockerfile is None or not os.path.isfile(dockerfile):
+            return [BuildError(context="Dockerfile", msg="is not a file")]
 
         dockerfile = os.path.abspath(dockerfile)
 
-        errors = []
+        errors: typing.List[LibError] = []
         build_args = {}
         for args in deployer.args:
             if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
-                errors.append("invalid build args")
+                errors.append(
+                    BuildError(context=context.name, msg="invalid build args")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -166,7 +134,9 @@ class BuildDeployerDocker(BuildDeployer):
         environment = {}
         for env in deployer.env:
             if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
-                errors.append("invalid environment")
+                errors.append(
+                    BuildError(context=context.name, msg="invalid environment")
+                )
                 break
 
             for key, value in arg_map.items():
@@ -178,35 +148,36 @@ class BuildDeployerDocker(BuildDeployer):
                 dockerfile=dockerfile,
                 buildargs=build_args,
             )
-
-            for log in logs:
-                if "stream" not in log:
-                    continue
-
-                LOG.info(log["stream"].strip())
         except docker.errors.BuildError as e:
-            return errors + [DeployError(f"Dockerfile failed to build > {e}")]
+            return errors + [
+                BuildError(context="Dockerfile", msg="failed to build", error=e)
+            ]
 
         port_bindings = {}
-        for port in deployer.ports:
-            if not port.public:
-                continue
-
-            if context.host:
+        if context.host:
+            for port in deployer.ports:
                 port_bindings[port.port] = (context.host, next(context.port_generator))
 
         if errors:
             return errors
 
-        aliases = [cls.get_name(context)]
+        aliases = []
+
+        dns_name = cls.get_dns_name(context)
+        aliases.append(dns_name)
+
+        container_name = cls.get_container_name(context)
+        if container_name != dns_name:
+            aliases.append(container_name)
+
         if deployer.name:
-            aliases += [to_docker_tag(deployer.name)]
+            aliases.append(to_docker_tag(deployer.name))
 
         try:
             context.docker_client.containers.run(
                 image=image,
                 detach=True,
-                name=cls.get_name(context),
+                name=container_name,
                 environment=environment,
                 ports=port_bindings,
                 network=context.network,
@@ -232,28 +203,45 @@ class BuildDeployerDocker(BuildDeployer):
 
             return []
         except docker.errors.ImageNotFound:
-            errors.append(DeployError("image not found for container"))
+            errors.append(DeployError(context=context.name, msg="image not found"))
         except docker.errors.APIError as e:
             if "reuse that name" in str(e):
-                errors.append(SkipError())
+                if skip_reuse:
+                    errors.append(SkipError())
+                else:
+                    errors.append(
+                        DeployError(
+                            context=context.name,
+                            msg="failed to deploy due to duplicate container",
+                            error=e,
+                        )
+                    )
             else:
-                errors.append(DeployError(f"api error when creating container > {e}"))
+                errors.append(
+                    DeployError(context=context.name, msg="failed to deploy", error=e)
+                )
 
         return errors
 
     @classmethod
     def stop(
-        cls, context: DeployContext, deployer: Deployer
+        cls, context: DeployContext, deployer: Deployer, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
-        name = to_docker_tag(context.name)
+        if context.docker_client is None:
+            return [BuildError(context="Docker", msg="client not initialized")]
 
         try:
-            container = context.docker_client.containers.get(name)
+            container = context.docker_client.containers.get(
+                cls.get_container_name(context)
+            )
 
             container.remove(force=True)
         except docker.errors.NotFound:
-            return [SkipError()]
+            if skip_not_found:
+                return [SkipError()]
+            else:
+                return [DeployError(context=context.name, msg="failed to stop")]
         except docker.errors.APIError as e:
-            [DeployError(f"api error when creating container > {e}")]
+            [DeployError(context=context.name, msg="failed to stop", error=e)]
 
         return []

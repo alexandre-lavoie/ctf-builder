@@ -1,9 +1,13 @@
 import argparse
 import os
 import os.path
+import time
+
+import docker
+import rich.console
 
 from .cmd.cli import CLI, Command, Menu
-from .logging import LOG, setup_logging
+from .cmd.common import CliContext
 
 
 def build_command(
@@ -33,14 +37,14 @@ def build_menu(
             )
 
 
-def run_menu(args, menu: Menu, root_directory: str, depth: int = 0) -> bool:
+def run_menu(args, menu: Menu, cli_context: CliContext, depth: int = 0) -> bool:
     target = getattr(args, f"_{depth}")
 
     option = menu.options.get(target)
     if isinstance(option, Command):
-        return option.cli(args, root_directory)
+        return option.cli(args, cli_context)
     elif isinstance(option, Menu):
-        return run_menu(args, option, root_directory, depth + 1)
+        return run_menu(args, option, cli_context, depth + 1)
 
     return False
 
@@ -51,13 +55,41 @@ def cli() -> int:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "-v", "--verbose", help="Verbose mode", action="store_true", default=False
+        "--quiet", action="store_true", help="Turn off logging", default=False
     )
 
     build_menu(parser, CLI, root_directory)
 
     args = parser.parse_args()
 
-    setup_logging(LOG, args.verbose)
+    docker_client = docker.from_env()
+    console = rich.console.Console(quiet=args.quiet)
 
-    return 0 if run_menu(args, CLI, root_directory) else 1
+    cli_context = CliContext(
+        root_directory=root_directory, console=console, docker_client=docker_client
+    )
+
+    path = []
+    i = 0
+    while True:
+        try:
+            path.append(getattr(args, f"_{i}"))
+        except:
+            break
+
+        i += 1
+
+    console.print(f"[bold blue]ctf-builder[/] - [yellow]{' '.join(path)}[/]\n")
+
+    start = time.time()
+    is_ok = run_menu(args, CLI, cli_context)
+    end = time.time()
+
+    delta = end - start
+
+    if is_ok:
+        console.print(f"[bold green]OK[/] in [bold green]{delta:.2f} s[/]")
+    else:
+        console.print(f"[bold red]ERROR[/] in [bold red]{delta:.2f} s[/]")
+
+    return 0 if is_ok else 1
