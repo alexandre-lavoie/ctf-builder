@@ -86,10 +86,15 @@ def cli() -> int:
     end = time.time()
 
     delta = end - start
+    delta_str = f"{delta:.2f}s"
 
     if is_ok:
-        console.print(f"[bold green]OK[/] in [bold green]{delta:.2f} s[/]")
+        console.print(
+            "[bold green]OK[/]", "in", f"[green]{delta_str}[/]", highlight=False
+        )
     else:
-        console.print(f"[bold red]ERROR[/] in [bold red]{delta:.2f} s[/]")
+        console.print(
+            "[bold red]ERROR[/]", "in", f"[red]{delta_str}[/]", highlight=False
+        )
 
     return 0 if is_ok else 1
