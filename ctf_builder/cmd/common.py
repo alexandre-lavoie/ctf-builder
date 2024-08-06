@@ -52,19 +52,6 @@ def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, No
         yield None
 
 
-def get_network(
-    client: docker.DockerClient, name: typing.Optional[str] = None
-) -> typing.Optional[docker.models.networks.Network]:
-    try:
-        return client.networks.get(name)
-    except docker.errors.NotFound:
-        pass
-    except docker.errors.APIError:
-        pass
-
-    return None
-
-
 def build_connection_string(
     host: str, port: int, protocol: PortProtocol, path: typing.Optional[str] = None
 ) -> str:
@@ -80,6 +67,28 @@ def build_connection_string(
     assert False, f"unhandled {protocol}"
 
 
+def get_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
+    try:
+        return client.networks.get(name)
+    except docker.errors.NotFound:
+        pass
+    except docker.errors.APIError:
+        pass
+
+    return None
+
+
+def create_network(
+    client: docker.DockerClient, name: typing.Optional[str] = None
+) -> typing.Optional[docker.models.networks.Network]:
+    try:
+        return client.networks.create(name, driver="bridge")
+    except docker.errors.APIError:
+        return None
+
+
 def get_create_network(
     client: docker.DockerClient, name: typing.Optional[str] = None
 ) -> typing.Optional[docker.models.networks.Network]:
@@ -87,12 +96,7 @@ def get_create_network(
     if network is not None:
         return network
 
-    try:
-        return client.networks.create(name, driver="bridge")
-    except docker.errors.APIError:
-        pass
-
-    return None
+    return create_network(client, name)
 
 
 def get_challenges(root_directory: str) -> typing.Optional[typing.Sequence[str]]:

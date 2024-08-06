@@ -14,7 +14,7 @@ from ..config import DEPLOY_SLEEP, DEPLOY_ATTEMPTS
 from ..error import LibError, DeployError
 from ..schema import Track, Deployer
 
-from .common import cli_challenge_wrapper, WrapContext, get_create_network, CliContext
+from .common import cli_challenge_wrapper, WrapContext, create_network, CliContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -29,13 +29,13 @@ class Context(WrapContext):
 
 def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     if context.docker_client is not None:
-        if (network := get_create_network(context.docker_client, to_docker_tag(f"ctf-builder_test_{track.tag or track.name}"))) is None:
-            return [
-                DeployError(
-                    context="Network",
-                    msg="could not be started"
-                )
-            ]
+        if (
+            network := create_network(
+                context.docker_client,
+                to_docker_tag(f"ctf-builder_test_{track.tag or track.name}"),
+            )
+        ) is None:
+            return [DeployError(context="Network", msg="failed to start")]
     else:
         network = None
 
@@ -63,14 +63,18 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                 if not deployer_errors:
                     running_deployers.append((deployer, deployer_context))
 
-                    if builder.has_healthcheck(deployer=deployer, context=deployer_context):
+                    if builder.has_healthcheck(
+                        deployer=deployer, context=deployer_context
+                    ):
                         waiting_deployers.append((deployer, deployer_context))
 
         if errors:
             return errors
 
         for i in range(DEPLOY_ATTEMPTS):
-            waiting_deployers_next: typing.List[typing.Tuple[Deployer, DeployContext]] = []
+            waiting_deployers_next: typing.List[
+                typing.Tuple[Deployer, DeployContext]
+            ] = []
 
             for deployer, deployer_context in waiting_deployers:
                 if BuildDeployer.get(deployer).is_healthy(
