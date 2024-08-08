@@ -1,8 +1,5 @@
 import argparse
 import dataclasses
-import glob
-import os
-import os.path
 import time
 import typing
 
@@ -14,7 +11,13 @@ from ..build.utils import to_docker_tag
 from ..config import DEPLOY_ATTEMPTS, DEPLOY_SLEEP
 from ..error import DeployError, LibError
 from ..schema import Deployer, Track
-from .common import CliContext, WrapContext, cli_challenge_wrapper, create_network
+from .common import (
+    CliContext,
+    WrapContext,
+    cli_challenge_wrapper,
+    create_network,
+    get_challenges,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -126,16 +129,12 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
-    challenge_directory = os.path.join(root_directory, "challenges")
-
-    challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
-
     parser.add_argument(
         "-c",
         "--challenge",
         action="append",
-        choices=challenges,
-        help="Name of challenge",
+        choices=get_challenges(root_directory) or [],
+        help="Name of challenges",
         default=[],
     )
 
@@ -150,7 +149,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     return cli_challenge_wrapper(
         root_directory=cli_context.root_directory,
-        challenges=args.challenge,
+        challenges=args.challenge if args.challenge else None,
         context=context,
         callback=test,
         console=cli_context.console,

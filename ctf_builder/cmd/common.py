@@ -1,3 +1,4 @@
+import argparse
 import dataclasses
 import glob
 import json
@@ -36,6 +37,22 @@ class CliContext:
     root_directory: str
     docker_client: docker.DockerClient
     console: typing.Optional[rich.console.Console]
+
+
+class ArgumentError(Exception):
+    pass
+
+
+class ExitError(Exception):
+    pass
+
+
+class ErrorArgumentParser(argparse.ArgumentParser):
+    def error(self, message: typing.Optional[str] = None) -> None:  # type: ignore
+        raise ArgumentError(message)
+
+    def exit(self, status: int = 0, message: typing.Optional[str] = None) -> None:  # type: ignore
+        raise ExitError(message)
 
 
 def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, None]:
@@ -170,7 +187,9 @@ def cli_challenge_wrapper(
     callback: typing.Callable[[Track, WC], typing.Sequence[LibError]],
     console: typing.Optional[rich.console.Console] = None,
 ) -> bool:
-    if not challenges:
+    skip_inactive = challenges is None
+
+    if challenges is None:
         next_challenges = get_challenges(root_directory)
         if next_challenges is None:
             print_errors(
@@ -182,14 +201,10 @@ def cli_challenge_wrapper(
                     )
                 ],
             )
-            if console:
-                console.print()
 
             return False
 
         challenges = next_challenges
-
-    skip_inactive = True if len(challenges) <= 1 else False
 
     error_map: typing.Dict[str, typing.List[LibError]] = {}
     threads: typing.List[typing.Tuple[threading.Thread, str]] = []
@@ -221,35 +236,38 @@ def cli_challenge_wrapper(
 
     all_errors = []
 
-    with rich.progress.Progress(
+    progress = rich.progress.Progress(
         rich.progress.TextColumn("{task.description}"),
         rich.progress.TimeElapsedColumn(),
         rich.progress.SpinnerColumn(style="progress.elapsed"),
         console=console,
-    ) as progress:
-        challenge_tasks = {}
-        for _, challenge in threads:
-            task_id = progress.add_task(challenge)
-            challenge_tasks[challenge] = progress.tasks[task_id]
+    )
 
-        running_queue: typing.List[typing.Tuple[threading.Thread, str]] = [*threads]
-        while running_queue:
-            thread, challenge = running_queue.pop(0)
+    challenge_tasks = {}
+    for _, challenge in threads:
+        task_id = progress.add_task(challenge)
+        challenge_tasks[challenge] = progress.tasks[task_id]
 
-            if thread.is_alive():
-                running_queue.append((thread, challenge))
-                time.sleep(0.1)
-                continue
+    running_queue: typing.List[typing.Tuple[threading.Thread, str]] = [*threads]
+    while running_queue:
+        thread, challenge = running_queue.pop(0)
 
-            errors = error_map[challenge]
-            all_errors += errors
+        if thread.is_alive():
+            running_queue.append((thread, challenge))
+            time.sleep(0.1)
+            continue
 
-            print_errors(
-                console=console,
-                prefix=context.error_prefix + [challenge],
-                errors=errors,
-                elapsed_time=challenge_tasks[challenge].elapsed,
-            )
-            progress.remove_task(challenge_tasks[challenge].id)
+        errors = error_map[challenge]
+        all_errors += errors
+
+        print_errors(
+            console=console,
+            prefix=context.error_prefix + [challenge],
+            errors=errors,
+            elapsed_time=challenge_tasks[challenge].elapsed,
+        )
+        progress.remove_task(challenge_tasks[challenge].id)
+
+    progress.refresh()
 
     return get_exit_status(all_errors)

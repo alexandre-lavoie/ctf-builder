@@ -22,6 +22,7 @@ from .common import (
     WrapContext,
     cli_challenge_wrapper,
     get_challenge_index,
+    get_challenges,
     get_create_network,
     port_generator,
 )
@@ -72,16 +73,12 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
-    challenge_directory = os.path.join(root_directory, "challenges")
-
-    challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
-
     parser.add_argument(
         "-c",
         "--challenge",
         action="append",
-        choices=challenges,
-        help="Name of challenge",
+        choices=get_challenges(root_directory) or [],
+        help="Name of challenges",
         default=[],
     )
     parser.add_argument(
@@ -145,7 +142,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
         if not cli_challenge_wrapper(
             root_directory=cli_context.root_directory,
-            challenges=args.challenge,
+            challenges=args.challenge if args.challenge else None,
             context=context,
             callback=start,
             console=cli_context.console,

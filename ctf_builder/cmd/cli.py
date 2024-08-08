@@ -7,6 +7,8 @@ from .build import cli_args as build_args
 from .common import CliContext
 from .ctfd.challenges import cli as ctfd_challenges_cli
 from .ctfd.challenges import cli_args as ctfd_challenges_args
+from .ctfd.dev import cli as ctfd_dev_cli
+from .ctfd.dev import cli_args as ctfd_dev_args
 from .ctfd.setup import cli as ctfd_setup_cli
 from .ctfd.setup import cli_args as ctfd_setup_args
 from .ctfd.teams import cli as ctfd_teams_cli
@@ -56,6 +58,11 @@ CLI = Menu(
             options={
                 "init": Command(
                     help="Setup CTFd", args=ctfd_setup_args, cli=ctfd_setup_cli
+                ),
+                "dev": Command(
+                    help="Run a CTFd development instance",
+                    args=ctfd_dev_args,
+                    cli=ctfd_dev_cli,
                 ),
                 "deploy": Menu(
                     help="Deploy to CTFd",

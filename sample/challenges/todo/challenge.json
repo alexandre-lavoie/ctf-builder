@@ -1,0 +1,6 @@
+{
+  "$schema": "../../doc/challenge.json",
+  "name": "TODO",
+  "active": false,
+  "challenges": []
+}

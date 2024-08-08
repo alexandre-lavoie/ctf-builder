@@ -5,8 +5,8 @@ import os.path
 import typing
 import uuid
 
-from ...ctfd import CTFdAPI
-from ...error import DeployError, LibError, get_exit_status, print_errors
+from ...ctfd import CTFdAPI, ctfd_errors
+from ...error import LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 
@@ -14,7 +14,7 @@ from ..common import CliContext
 class Args:
     api_key: str
     file: str
-    output: typing.Union[str, typing.TextIO]
+    output: str
     url: str = dataclasses.field(default="http://localhost:8000")
 
 
@@ -115,19 +115,25 @@ def make_teams(file: str) -> typing.List[Team]:
 
 
 def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
-    res = context.session.post(
-        "/users",
-        user.to_api(),
-    )
+    res = context.session.get("/users", data={"q": user.email})
 
-    if res.status_code != 200:
-        return [
-            DeployError(
-                context=f"User {user.name}",
-                msg="failed to deploy",
-                error=ValueError(res.json()["message"]),
-            )
-        ]
+    user_api = None
+    if res.status_code == 200:
+        data = res.json()["data"]
+
+        if len(data) == 1:
+            user_api = data[0]
+
+    if user_api:
+        res = context.session.patch(f"/users/{user_api['id']}", data=user.to_api())
+    else:
+        res = context.session.post(
+            "/users",
+            data=user.to_api(),
+        )
+
+    if res_errors := ctfd_errors(res, context=f"User {user.name}"):
+        return res_errors
 
     data = res.json()["data"]
     user.id = data["id"]
@@ -138,37 +144,42 @@ def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
 def add_user_to_team(
     team_id: int, user_id: int, context: Context
 ) -> typing.Sequence[LibError]:
+    res = context.session.get(f"/teams/{team_id}/members")
+
+    if res.status_code == 200:
+        user_ids = set(res.json()["data"])
+
+        if user_id in user_ids:
+            return []
+
     res = context.session.post(
         f"/teams/{team_id}/members",
-        {"user_id": user_id},
+        data={"user_id": user_id},
     )
 
-    if res.status_code != 200:
-        return [
-            DeployError(
-                context=f"User {user_id}",
-                msg="failed to deploy",
-                error=ValueError(res.json()["message"]),
-            )
-        ]
-
-    return []
+    return ctfd_errors(res, context=f"User {user_id}")
 
 
 def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
-    res = context.session.post(
-        "/teams",
-        team.to_api(),
-    )
+    res = context.session.get("/teams", data={"q": team.email})
 
-    if res.status_code != 200:
-        return [
-            DeployError(
-                context="Team",
-                msg="failed to deploy",
-                error=ValueError(res.json()["message"]),
-            )
-        ]
+    team_api = None
+    if res.status_code == 200:
+        data = res.json()["data"]
+
+        if len(data) == 1:
+            team_api = data[0]
+
+    if team_api:
+        res = context.session.patch(f"/teams/{team_api['id']}", data=team.to_api())
+    else:
+        res = context.session.post(
+            "/teams",
+            data=team.to_api(),
+        )
+
+    if res_errors := ctfd_errors(res, context="Team"):
+        return res_errors
 
     data = res.json()["data"]
     team_id = data["id"]
@@ -206,6 +217,34 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     )
 
 
+def merge_teams_json(
+    old: typing.Dict[str, typing.Any], new: typing.Dict[str, typing.Any]
+) -> typing.Dict[str, typing.Any]:
+    out = {**new}
+
+    teams = []
+    for old_team, new_team in zip(old["teams"], new["teams"]):
+        team = {**new_team}
+
+        team["password"] = old_team["password"]
+
+        users = []
+        for old_user, new_user in zip(old_team["users"], new_team["users"]):
+            user = {**new_user}
+
+            user["password"] = old_user["password"]
+
+            users.append(user)
+
+        team["users"] = users
+
+        teams.append(team)
+
+    out["teams"] = teams
+
+    return out
+
+
 def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
@@ -227,14 +266,17 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         if not errors:
             out_teams.append(team)
 
-    if cli_context.console:
-        cli_context.console.print()
+    out_json = {"teams": [team.to_dict() for team in out_teams]}
 
-    out_json = [team.to_dict() for team in out_teams]
-    if isinstance(args.output, str):
-        with open(args.output, "w") as h:
-            json.dump(out_json, h, indent=2)
-    else:
-        json.dump(out_json, args.output, indent=2)
+    if os.path.isfile(args.output):
+        with open(args.output) as h:
+            try:
+                old_json = json.load(h)
+                out_json = merge_teams_json(old_json, out_json)
+            except ValueError:
+                pass
+
+    with open(args.output, "w") as h:
+        json.dump(out_json, h, indent=2)
 
     return get_exit_status(all_errors)

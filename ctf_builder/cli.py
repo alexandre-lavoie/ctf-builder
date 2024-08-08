@@ -91,6 +91,8 @@ def cli() -> int:
     delta = end - start
     delta_str = f"{delta:.2f}s"
 
+    console.print()
+
     if is_ok:
         console.print(
             "[bold green]OK[/]", "in", f"[green]{delta_str}[/]", highlight=False

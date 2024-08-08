@@ -74,7 +74,9 @@ def __parse_type(
                 if not isinstance(k, str):
                     continue
 
-                d, err = __parse_type(args[1], v, f"{key_path}.{k}")
+                d, err = __parse_type(
+                    ptype=args[1], data=v, key_path=f"{key_path}.{k}", comment=comment
+                )
 
                 if err:
                     errors += err
@@ -89,7 +91,9 @@ def __parse_type(
         if isinstance(data, list):
             list_output = []
             for i, v in enumerate(data):
-                d, err = __parse_type(args[0], v, f"{key_path}.{i}")
+                d, err = __parse_type(
+                    ptype=args[0], data=v, key_path=f"{key_path}.{i}", comment=comment
+                )
 
                 if err:
                     errors += err
@@ -170,7 +174,7 @@ def __parse_type(
                         ParseError(
                             path=f"{key_path}.{data_field.name}",
                             expected=__expected(data_field.type),
-                            comment=comment,
+                            comment=data_field.metadata.get(COMMENT_FIELD_NAME),
                         )
                     ]
                 else:
@@ -200,4 +204,4 @@ def parse_track(
     if data is None:
         return None, [ParseError("", __expected(Track))]
 
-    return __parse_type(Track, data)
+    return __parse_type(ptype=Track, data=data)

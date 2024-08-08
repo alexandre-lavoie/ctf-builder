@@ -1,6 +1,6 @@
-import io
 import json
 import os.path
+import tempfile
 import time
 import typing
 
@@ -13,12 +13,14 @@ from ctf_builder.cmd.build import cli as build_cli
 from ctf_builder.cmd.common import CliContext
 from ctf_builder.cmd.ctfd.challenges import Args as ChallengesArgs
 from ctf_builder.cmd.ctfd.challenges import cli as challenges_cli
+from ctf_builder.cmd.ctfd.dev import Args as DevArgs
+from ctf_builder.cmd.ctfd.dev import cli as dev_cli
 from ctf_builder.cmd.ctfd.setup import Args as SetupArgs
 from ctf_builder.cmd.ctfd.setup import cli as setup_cli
 from ctf_builder.cmd.ctfd.teams import Args as TeamsArgs
 from ctf_builder.cmd.ctfd.teams import cli as teams_cli
 from ctf_builder.config import CHALLENGE_BASE_PORT
-from ctf_builder.ctfd import generate_key
+from ctf_builder.ctfd import ctfd_container, generate_key
 
 
 TEST_NAME = "test"
@@ -29,7 +31,7 @@ TEST_URL = f"http://localhost:{TEST_PORT}/"
 TEST_CHALLENGES: typing.List[str] = []
 
 
-def test() -> None:
+def test_dev() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )
@@ -40,35 +42,24 @@ def test() -> None:
         console=rich.console.Console(quiet=True),
     )
 
-    # Create a CTFd container
-    container: docker.models.containers.Container = (
-        context.docker_client.containers.run(
-            image="ctfd/ctfd",
-            ports={"8000": TEST_PORT},
-            detach=True,
-            remove=True,
-            healthcheck={
-                "test": "python -c \"import requests; requests.get('http://localhost:8000/')\" || exit 1",
-                "interval": 1_000_000_000,
-                "timeout": 1_000_000_000,
-                "retries": 10,
-                "start_period": 1_000_000_000,
-            },
-        )
+    assert dev_cli(cli_context=context, args=DevArgs(port=TEST_PORT, exit=True))
+
+
+def test_deploy() -> None:
+    root_directory = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )
 
+    context = CliContext(
+        root_directory=root_directory,
+        docker_client=docker.from_env(),
+        console=rich.console.Console(quiet=True),
+    )
+
+    container, _ = ctfd_container(docker_client=context.docker_client, port=TEST_PORT)
+    assert container, "Container did not start"
+
     try:
-        # Wait for container to be healthy
-        for _ in range(40):
-            container.reload()
-
-            if container.health == "healthy":
-                break
-
-            time.sleep(0.5)
-        else:
-            assert False, "Container failed to start"
-
         # Setup CTFd
         assert setup_cli(
             cli_context=context,
@@ -88,32 +79,56 @@ def test() -> None:
         api_key = token[1]
 
         # Deploy teams
-        teams_output = io.StringIO()
-        assert teams_cli(
-            cli_context=context,
-            args=TeamsArgs(
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = os.path.join(temp_dir, "teams.json")
+            team_args = TeamsArgs(
                 api_key=api_key,
                 file=os.path.join(context.root_directory, "ctfd", "teams.json"),
-                output=teams_output,
+                output=output,
                 url=TEST_URL,
-            ),
-        )
-        teams_output.seek(0)
+            )
 
-        assert json.load(teams_output)
+            # First deploy
+            assert teams_cli(
+                cli_context=context,
+                args=team_args,
+            )
+
+            with open(output) as h:
+                old_teams = json.load(h)
+
+            # Second deploy, should sync
+            assert teams_cli(
+                cli_context=context,
+                args=team_args,
+            )
+
+            with open(output) as h:
+                new_teams = json.load(h)
+
+            assert old_teams == new_teams, "Teams do not match"
 
         # Build challenges
         assert build_cli(cli_context=context, args=BuildArgs(challenge=TEST_CHALLENGES))
 
         # Deploy challenges
+        challenge_args = ChallengesArgs(
+            api_key=api_key,
+            url=TEST_URL,
+            port=CHALLENGE_BASE_PORT,
+            challenge=TEST_CHALLENGES,
+        )
+
+        ## First Deploy
         assert challenges_cli(
             cli_context=context,
-            args=ChallengesArgs(
-                api_key=api_key,
-                url=TEST_URL,
-                port=CHALLENGE_BASE_PORT,
-                challenge=TEST_CHALLENGES,
-            ),
+            args=challenge_args,
+        )
+
+        ## Second Deploy
+        assert challenges_cli(
+            cli_context=context,
+            args=challenge_args,
         )
     finally:
         container.remove(force=True)
