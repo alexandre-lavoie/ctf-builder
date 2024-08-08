@@ -12,6 +12,7 @@ import rich.console
 import rich.markup
 import rich.progress
 
+from ...config import CHALLENGE_BASE_PORT
 from ...ctfd import ctfd_container, generate_key
 from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import (
@@ -33,6 +34,7 @@ class Args:
     port: int
     exit: bool = dataclasses.field(default=False)
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    base_port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
 
 
 DEV_SETUP = SetupData(
@@ -129,11 +131,16 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
             _, api_key = token
 
             # Deploy challenges
+            challenge_args = ChallengesArgs(
+                api_key=api_key,
+                url=ctfd_url,
+                port=args.base_port,
+                challenge=args.challenge,
+            )
+
             challenge_status = challenges_cli(
                 cli_context=cli_context,
-                args=ChallengesArgs(
-                    api_key=api_key, url=ctfd_url, challenge=args.challenge
-                ),
+                args=challenge_args,
             )
             if not challenge_status:
                 return [DeployError(context="challenges", msg="failed to deploy")]
@@ -186,9 +193,7 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
             if interactive_args.reload:
                 challenges_cli(
                     cli_context=cli_context,
-                    args=ChallengesArgs(
-                        api_key=api_key, url=ctfd_url, challenge=args.challenge
-                    ),
+                    args=challenge_args,
                 )
 
         return []
@@ -211,6 +216,13 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         choices=get_challenges(root_directory) or [],
         help="Name of challenges",
         default=[],
+    )
+    parser.add_argument(
+        "-b",
+        "--base_port",
+        type=int,
+        help="Starting port for challenges",
+        default=CHALLENGE_BASE_PORT,
     )
     parser.add_argument("--exit", help="Exit instance when started", default=False)
 
