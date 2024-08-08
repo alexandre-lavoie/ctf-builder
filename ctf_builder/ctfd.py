@@ -5,6 +5,8 @@ import typing
 
 import requests
 
+from .error import DeployError, LibError
+
 
 VERSION = "/api/v1"
 NONCE_RE = re.compile(r"<input id=\"nonce\".+?value=\"(.+?)\">")
@@ -19,34 +21,39 @@ class CTFdAPI:
     def __headers(self) -> typing.Dict[str, str]:
         return {"Authorization": f"Token {self.api_key}"}
 
-    def get(self, path: str) -> requests.Response:
-        return requests.get(f"{self.url}{VERSION}{path}", headers=self.__headers())
+    def __url(self, path: str) -> str:
+        return f"{self.url}{VERSION}{path}"
+
+    def get(
+        self, path: str, data: typing.Optional[typing.Dict[str, typing.Any]] = None
+    ) -> requests.Response:
+        return requests.get(
+            url=self.__url(path),
+            headers={**self.__headers(), "Content-Type": "application/json"},
+            params=data,
+        )
 
     def post(self, path: str, data: typing.Dict[str, typing.Any]) -> requests.Response:
-        return requests.post(
-            f"{self.url}{VERSION}{path}", headers=self.__headers(), json=data
-        )
+        return requests.post(url=self.__url(path), headers=self.__headers(), json=data)
 
     def post_data(
         self, path: str, data: typing.Dict[str, typing.Any], files: typing.Any
     ) -> requests.Response:
         return requests.post(
-            f"{self.url}{VERSION}{path}",
+            url=self.__url(path),
             headers=self.__headers(),
             data=data,
             files=files,
         )
 
     def patch(self, path: str, data: typing.Dict[str, typing.Any]) -> requests.Response:
-        return requests.patch(
-            f"{self.url}{VERSION}{path}", headers=self.__headers(), json=data
-        )
+        return requests.patch(url=self.__url(path), headers=self.__headers(), json=data)
 
     def delete(
         self, path: str, data: typing.Dict[str, typing.Any]
     ) -> requests.Response:
         return requests.delete(
-            f"{self.url}{VERSION}{path}", headers=self.__headers(), json=data
+            url=self.__url(path), headers=self.__headers(), json=data
         )
 
 
@@ -99,3 +106,18 @@ def generate_key(
     data = res.json()["data"]
 
     return data["id"], data["value"]
+
+
+def ctfd_errors(res: requests.Response, context: str) -> typing.Sequence[LibError]:
+    if res.status_code == 200:
+        return []
+
+    data: typing.Dict[str, typing.Any] = res.json()
+
+    return [
+        DeployError(
+            context=context,
+            msg="failed to deploy",
+            error=ValueError(data.get("message") or data.get("errors")),
+        )
+    ]

@@ -1,6 +1,6 @@
-import io
 import json
 import os.path
+import tempfile
 import time
 import typing
 
@@ -88,19 +88,34 @@ def test() -> None:
         api_key = token[1]
 
         # Deploy teams
-        teams_output = io.StringIO()
-        assert teams_cli(
-            cli_context=context,
-            args=TeamsArgs(
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output = os.path.join(temp_dir, "teams.json")
+            args = TeamsArgs(
                 api_key=api_key,
                 file=os.path.join(context.root_directory, "ctfd", "teams.json"),
-                output=teams_output,
+                output=output,
                 url=TEST_URL,
-            ),
-        )
-        teams_output.seek(0)
+            )
 
-        assert json.load(teams_output)
+            # First deploy
+            assert teams_cli(
+                cli_context=context,
+                args=args,
+            )
+
+            with open(output) as h:
+                old_teams = json.load(h)
+
+            # Second deploy, should sync
+            assert teams_cli(
+                cli_context=context,
+                args=args,
+            )
+
+            with open(output) as h:
+                new_teams = json.load(h)
+
+            assert old_teams == new_teams, "Teams do not match"
 
         # Build challenges
         assert build_cli(cli_context=context, args=BuildArgs(challenge=TEST_CHALLENGES))
