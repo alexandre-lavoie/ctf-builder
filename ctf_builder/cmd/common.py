@@ -11,6 +11,7 @@ import docker
 import docker.errors
 import docker.models.networks
 import rich.console
+import rich.control
 import rich.progress
 
 from ..config import CHALLENGE_MAX_PORTS
@@ -236,38 +237,38 @@ def cli_challenge_wrapper(
 
     all_errors = []
 
-    progress = rich.progress.Progress(
+    with rich.progress.Progress(
         rich.progress.TextColumn("{task.description}"),
         rich.progress.TimeElapsedColumn(),
         rich.progress.SpinnerColumn(style="progress.elapsed"),
         console=console,
-    )
+    ) as progress:
+        challenge_tasks = {}
+        for _, challenge in threads:
+            task_id = progress.add_task(challenge)
+            challenge_tasks[challenge] = progress.tasks[task_id]
 
-    challenge_tasks = {}
-    for _, challenge in threads:
-        task_id = progress.add_task(challenge)
-        challenge_tasks[challenge] = progress.tasks[task_id]
+        running_queue: typing.List[typing.Tuple[threading.Thread, str]] = [*threads]
+        while running_queue:
+            thread, challenge = running_queue.pop(0)
 
-    running_queue: typing.List[typing.Tuple[threading.Thread, str]] = [*threads]
-    while running_queue:
-        thread, challenge = running_queue.pop(0)
+            if thread.is_alive():
+                running_queue.append((thread, challenge))
+                time.sleep(0.1)
+                continue
 
-        if thread.is_alive():
-            running_queue.append((thread, challenge))
-            time.sleep(0.1)
-            continue
+            errors = error_map[challenge]
+            all_errors += errors
 
-        errors = error_map[challenge]
-        all_errors += errors
+            print_errors(
+                console=console,
+                prefix=context.error_prefix + [challenge],
+                errors=errors,
+                elapsed_time=challenge_tasks[challenge].elapsed,
+            )
+            progress.remove_task(challenge_tasks[challenge].id)
 
-        print_errors(
-            console=console,
-            prefix=context.error_prefix + [challenge],
-            errors=errors,
-            elapsed_time=challenge_tasks[challenge].elapsed,
-        )
-        progress.remove_task(challenge_tasks[challenge].id)
-
-    progress.refresh()
+    if console:
+        console.control(rich.control.Control.move(0, -1))
 
     return get_exit_status(all_errors)
