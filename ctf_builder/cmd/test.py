@@ -11,7 +11,13 @@ from ..build.utils import to_docker_tag
 from ..config import DEPLOY_ATTEMPTS, DEPLOY_SLEEP
 from ..error import DeployError, LibError
 from ..schema import Deployer, Track
-from .common import CliContext, WrapContext, cli_challenge_wrapper, create_network, get_challenges
+from .common import (
+    CliContext,
+    WrapContext,
+    cli_challenge_wrapper,
+    create_network,
+    get_challenges,
+)
 
 
 @dataclasses.dataclass(frozen=True)

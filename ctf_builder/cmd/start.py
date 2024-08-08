@@ -22,9 +22,9 @@ from .common import (
     WrapContext,
     cli_challenge_wrapper,
     get_challenge_index,
+    get_challenges,
     get_create_network,
     port_generator,
-    get_challenges
 )
 
 

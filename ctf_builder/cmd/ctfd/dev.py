@@ -9,11 +9,18 @@ import typing
 import docker
 import docker.models.containers
 import rich.console
+import rich.markup
 import rich.progress
 
 from ...ctfd import ctfd_container, generate_key
 from ...error import DeployError, LibError, get_exit_status, print_errors
-from ..common import ArgumentError, CliContext, ErrorArgumentParser, ExitError, get_challenges
+from ..common import (
+    ArgumentError,
+    CliContext,
+    ErrorArgumentParser,
+    ExitError,
+    get_challenges,
+)
 from .challenges import Args as ChallengesArgs
 from .challenges import cli as challenges_cli
 from .setup import Args as SetupArgs
@@ -25,6 +32,7 @@ from .setup import cli as setup_cli
 class Args:
     port: int
     exit: bool = dataclasses.field(default=False)
+    challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
 
 
 DEV_SETUP = SetupData(
@@ -123,7 +131,9 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
             # Deploy challenges
             challenge_status = challenges_cli(
                 cli_context=cli_context,
-                args=ChallengesArgs(api_key=api_key, url=ctfd_url),
+                args=ChallengesArgs(
+                    api_key=api_key, url=ctfd_url, challenge=args.challenge
+                ),
             )
             if not challenge_status:
                 return [DeployError(context="challenges", msg="failed to deploy")]
@@ -156,12 +166,16 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
 
         # Interactive mode
         while True:
-            user_input = cli_context.console.input("\n> ")
+            user_input = cli_context.console.input("\n> ").strip()
+            user_args = user_input.split(" ")
+
+            if "-e" not in user_args and "--exit" not in user_args:
+                cli_context.console.print()
 
             try:
-                interactive_args = parser.parse_args(user_input.split(" "))
+                interactive_args = parser.parse_args(user_args)
             except ArgumentError as e:
-                cli_context.console.print(e)
+                cli_context.console.print(f"[red]{rich.markup.escape(str(e))}[/]")
                 continue
             except ExitError as e:
                 continue
@@ -170,11 +184,11 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
                 break
 
             if interactive_args.reload:
-                cli_context.console.print()
-
                 challenges_cli(
                     cli_context=cli_context,
-                    args=ChallengesArgs(api_key=api_key, url=ctfd_url),
+                    args=ChallengesArgs(
+                        api_key=api_key, url=ctfd_url, challenge=args.challenge
+                    ),
                 )
 
         return []

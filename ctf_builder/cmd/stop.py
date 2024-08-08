@@ -9,7 +9,13 @@ from ..build.deployer import BuildDeployer, DeployContext
 from ..config import DEPLOY_NETWORK
 from ..error import DeployError, LibError, SkipError, print_errors
 from ..schema import Track
-from .common import CliContext, WrapContext, cli_challenge_wrapper, get_network, get_challenges
+from .common import (
+    CliContext,
+    WrapContext,
+    cli_challenge_wrapper,
+    get_challenges,
+    get_network,
+)
 
 
 @dataclasses.dataclass(frozen=True)

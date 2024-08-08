@@ -19,7 +19,7 @@ from ..common import (
     build_connection_string,
     cli_challenge_wrapper,
     get_challenge_index,
-    get_challenges
+    get_challenges,
 )
 
 
