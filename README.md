@@ -137,15 +137,36 @@ ctf start -n team1 -i 192.168.0.2 -n team2 -i 192.168.0.3 ...
 
 ## 🚩 CTFd
 
+[CTFd](https://ctfd.io/) is supported out of the box. This allows to automate deploying challenges.
+
+### 🔧 Dev
+
+```
+ctf ctfd dev
+```
+
+A simple development environment. Automatically spins up challenges without any hassle.
+
+#### Credentials
+
+The credentials for the default/admin user is the following.
+
+```
+Name: admin
+Password: admin
+```
+
+#### Interactive Console
+
+By default, an interactive console is open when the environment spun up. This is an [argparse](https://docs.python.org/3/library/argparse.html), therefore acts like a CLI argument parser. Help for available commands can be accessed through `-h`. 
+
+### 🚀 Deploy
+
 ```
 ctf ctfd init
 ctf ctfd deploy teams
 ctf ctfd deploy challenges
 ```
-
-[CTFd](https://ctfd.io/) is supported out of the box. This allows to automate deploying challenges.
-
-### Usage
 
 Easiest way to get started is to run the [Docker container](https://docs.docker.com/get-docker/) for [CTFd](https://ctfd.io/).
 

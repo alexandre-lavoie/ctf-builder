@@ -266,9 +266,6 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         if not errors:
             out_teams.append(team)
 
-    if cli_context.console:
-        cli_context.console.print()
-
     out_json = {"teams": [team.to_dict() for team in out_teams]}
 
     if os.path.isfile(args.output):

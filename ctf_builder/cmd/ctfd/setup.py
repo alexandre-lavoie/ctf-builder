@@ -2,6 +2,7 @@ import argparse
 import dataclasses
 import json
 import os.path
+import time
 import typing
 
 import requests
@@ -74,9 +75,9 @@ class SetupData:
     account_visibility: str
     registration_visibility: str
     verify_emails: bool
-    name: str
-    email: str
-    password: str
+    name: str = dataclasses.field(default="")
+    email: str = dataclasses.field(default="")
+    password: str = dataclasses.field(default="")
     ctf_theme: str = dataclasses.field(default="core-beta")
     theme_color: str = dataclasses.field(default="")
     start: str = dataclasses.field(default="")
@@ -167,7 +168,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     )
     parser.add_argument("-n", "--name", help="Admin account name", default="admin")
     parser.add_argument(
-        "-e", "--email", help="Admin account email", default="admin@ctf.com"
+        "-e", "--email", help="Admin account email", default="admin@ctfd.io"
     )
     parser.add_argument(
         "-f",
@@ -178,6 +179,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
+    start_time = time.time()
     errors = setup(
         Context(
             url=args.url,
@@ -187,10 +189,13 @@ def cli(args: Args, cli_context: CliContext) -> bool:
             password=args.password,
         )
     )
+    end_time = time.time()
 
-    print_errors(errors=errors, console=cli_context.console)
-
-    if cli_context.console:
-        cli_context.console.print()
+    print_errors(
+        prefix=["setup"],
+        errors=errors,
+        console=cli_context.console,
+        elapsed_time=end_time - start_time,
+    )
 
     return get_exit_status(errors)
