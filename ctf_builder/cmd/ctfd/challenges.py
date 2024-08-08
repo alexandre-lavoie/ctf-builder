@@ -19,6 +19,7 @@ from ..common import (
     build_connection_string,
     cli_challenge_wrapper,
     get_challenge_index,
+    get_challenges
 )
 
 
@@ -454,10 +455,6 @@ def deploy_challenge(track: Track, context: Context) -> typing.Sequence[LibError
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
-    challenge_directory = os.path.join(root_directory, "challenges")
-
-    challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
-
     parser.add_argument("-k", "--api_key", help="API Key", required=True)
     parser.add_argument(
         "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
@@ -466,8 +463,8 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         "-c",
         "--challenge",
         action="append",
-        choices=challenges,
-        help="Name of challenge to build",
+        choices=get_challenges(root_directory) or [],
+        help="Name of challenges",
         default=[],
     )
     parser.add_argument(

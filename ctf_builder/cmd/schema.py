@@ -1,13 +1,10 @@
 import argparse
 import dataclasses
-import glob
-import os
-import os.path
 import typing
 
 from ..error import LibError
 from ..schema import Track
-from .common import CliContext, WrapContext, cli_challenge_wrapper
+from .common import CliContext, WrapContext, cli_challenge_wrapper, get_challenges
 
 
 @dataclasses.dataclass(frozen=True)
@@ -25,16 +22,12 @@ def schema(track: Track, context: Context) -> typing.Sequence[LibError]:
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
-    challenge_directory = os.path.join(root_directory, "challenges")
-
-    challenges = [file for file in glob.glob("*", root_dir=challenge_directory)]
-
     parser.add_argument(
         "-c",
         "--challenge",
         action="append",
-        choices=challenges,
-        help="Name of challenge",
+        choices=get_challenges(root_directory) or [],
+        help="Name of challenges",
         default=[],
     )
 

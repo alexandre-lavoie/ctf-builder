@@ -13,7 +13,7 @@ import rich.progress
 
 from ...ctfd import ctfd_container, generate_key
 from ...error import DeployError, LibError, get_exit_status, print_errors
-from ..common import ArgumentError, CliContext, ErrorArgumentParser, ExitError
+from ..common import ArgumentError, CliContext, ErrorArgumentParser, ExitError, get_challenges
 from .challenges import Args as ChallengesArgs
 from .challenges import cli as challenges_cli
 from .setup import Args as SetupArgs
@@ -190,6 +190,14 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument("-p", "--port", help="CTFd port", default=8000)
+    parser.add_argument(
+        "-c",
+        "--challenge",
+        action="append",
+        choices=get_challenges(root_directory) or [],
+        help="Name of challenges",
+        default=[],
+    )
     parser.add_argument("--exit", help="Exit instance when started", default=False)
 
 
