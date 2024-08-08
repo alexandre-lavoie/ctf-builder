@@ -64,7 +64,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     return cli_challenge_wrapper(
         root_directory=cli_context.root_directory,
-        challenges=args.challenge,
+        challenges=args.challenge if args.challenge else None,
         context=context,
         callback=build,
         console=cli_context.console,

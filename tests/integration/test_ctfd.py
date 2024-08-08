@@ -90,7 +90,7 @@ def test() -> None:
         # Deploy teams
         with tempfile.TemporaryDirectory() as temp_dir:
             output = os.path.join(temp_dir, "teams.json")
-            args = TeamsArgs(
+            team_args = TeamsArgs(
                 api_key=api_key,
                 file=os.path.join(context.root_directory, "ctfd", "teams.json"),
                 output=output,
@@ -100,7 +100,7 @@ def test() -> None:
             # First deploy
             assert teams_cli(
                 cli_context=context,
-                args=args,
+                args=team_args,
             )
 
             with open(output) as h:
@@ -109,7 +109,7 @@ def test() -> None:
             # Second deploy, should sync
             assert teams_cli(
                 cli_context=context,
-                args=args,
+                args=team_args,
             )
 
             with open(output) as h:
@@ -121,14 +121,23 @@ def test() -> None:
         assert build_cli(cli_context=context, args=BuildArgs(challenge=TEST_CHALLENGES))
 
         # Deploy challenges
+        challenge_args = ChallengesArgs(
+            api_key=api_key,
+            url=TEST_URL,
+            port=CHALLENGE_BASE_PORT,
+            challenge=TEST_CHALLENGES,
+        )
+
+        ## First Deploy
         assert challenges_cli(
             cli_context=context,
-            args=ChallengesArgs(
-                api_key=api_key,
-                url=TEST_URL,
-                port=CHALLENGE_BASE_PORT,
-                challenge=TEST_CHALLENGES,
-            ),
+            args=challenge_args,
+        )
+
+        ## Second Deploy
+        assert challenges_cli(
+            cli_context=context,
+            args=challenge_args,
         )
     finally:
         container.remove(force=True)

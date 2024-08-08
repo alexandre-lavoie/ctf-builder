@@ -1,0 +1,45 @@
+{
+  "$schema": "../../doc/challenge.json",
+  "name": "Sequence",
+  "active": true,
+  "challenges": [
+    {
+      "name": "First",
+      "category": "Sample",
+      "value": 0,
+      "flags": [
+        {
+          "case_sensitive": true,
+          "regex": false,
+          "values": {
+            "$type": "env",
+            "path": "FLAG",
+            "keys": [
+              "FLAG1"
+            ]
+          }
+        }
+      ],
+      "next": 1
+    },
+    {
+      "name": "Second",
+      "category": "Sample",
+      "value": 0,
+      "flags": [
+        {
+          "case_sensitive": true,
+          "regex": false,
+          "values": {
+            "$type": "env",
+            "path": "FLAG",
+            "keys": [
+              "FLAG2"
+            ]
+          }
+        }
+      ],
+      "prerequisites": [0]
+    }
+  ]
+}

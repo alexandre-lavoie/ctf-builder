@@ -49,11 +49,10 @@ class CTFdAPI:
     def patch(self, path: str, data: typing.Dict[str, typing.Any]) -> requests.Response:
         return requests.patch(url=self.__url(path), headers=self.__headers(), json=data)
 
-    def delete(
-        self, path: str, data: typing.Dict[str, typing.Any]
-    ) -> requests.Response:
+    def delete(self, path: str) -> requests.Response:
         return requests.delete(
-            url=self.__url(path), headers=self.__headers(), json=data
+            url=self.__url(path),
+            headers={**self.__headers(), "Content-Type": "application/json"},
         )
 
 

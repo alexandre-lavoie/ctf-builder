@@ -10,7 +10,7 @@ from ...build.deployer import BuildDeployer
 from ...build.flag import BuildFlag
 from ...build.translation import BuildTranslation
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
-from ...ctfd import CTFdAPI
+from ...ctfd import CTFdAPI, ctfd_errors
 from ...error import BuildError, DeployError, LibError
 from ...schema import Track, Translation
 from ..common import (
@@ -37,7 +37,7 @@ class Context(WrapContext):
 
 
 @dataclasses.dataclass
-class ChallengeCreateRequest:
+class ChallengeRequest:
     category: str
     description: str
     name: str
@@ -62,9 +62,9 @@ def build_translation(
     return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
 
 
-def build_create_challenges(
+def build_challenge_requests(
     track: Track, context: Context
-) -> typing.Tuple[typing.List[ChallengeCreateRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[ChallengeRequest], typing.Sequence[LibError]]:
     output = []
     errors = []
 
@@ -124,7 +124,7 @@ def build_create_challenges(
             connection_info = None
 
         output.append(
-            ChallengeCreateRequest(
+            ChallengeRequest(
                 name=name,
                 description=description,
                 category=challenge.category,
@@ -136,93 +136,118 @@ def build_create_challenges(
     return output, errors
 
 
-def post_create_challenges(
-    reqs: typing.List[ChallengeCreateRequest], context: Context
+def send_challenge_requests(
+    reqs: typing.List[ChallengeRequest], context: Context
 ) -> typing.Tuple[typing.List[int], typing.Sequence[LibError]]:
     output = []
-    errors = []
+    errors: typing.List[LibError] = []
 
     for i, req in enumerate(reqs):
-        res = context.session.post(
-            "/challenges",
-            dataclasses.asdict(req),
-        )
+        res = context.session.get("/challenges", data={"name": req.name})
 
-        if res.status_code != 200:
-            errors.append(
-                BuildError(
-                    context=f"Challenge {i}",
-                    msg="failed to create",
-                    error=ValueError(res.json()["message"]),
-                )
+        challenge_id = None
+        if res.status_code == 200:
+            data = res.json()["data"]
+
+            if len(data) == 1:
+                challenge_api = data[0]
+                challenge_id = challenge_api["id"]
+
+        if challenge_id:
+            res = context.session.patch(
+                f"/challenges/{challenge_id}",
+                data=dataclasses.asdict(req),
             )
+        else:
+            res = context.session.post(
+                "/challenges",
+                data=dataclasses.asdict(req),
+            )
+
+        if res_errors := ctfd_errors(res, context=f"Challenge {i}"):
+            errors += res_errors
             continue
 
-        data = res.json()["data"]
-        id = data["id"]
-
-        output.append(id)
+        output.append(res.json()["data"]["id"])
 
     return output, errors
 
 
 @dataclasses.dataclass
-class FlagCreateRequest:
+class FlagRequest:
     challenge: int
     content: str
     type: str
     data: typing.Optional[str] = dataclasses.field(default=None)
 
 
-def build_create_flags(
+def build_flag_requests(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Tuple[typing.List[FlagCreateRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[FlagRequest], typing.Sequence[LibError]]:
     output = []
     errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
-        for flag in challenge.flags:
-            for content in BuildFlag.build(context.challenge_path, flag):
+        for flag_def in challenge.flags:
+            for flag in BuildFlag.build(context.challenge_path, flag_def):
                 output.append(
-                    FlagCreateRequest(
+                    FlagRequest(
                         challenge=id,
-                        content=content,
-                        type="regex" if flag.regex else "static",
-                        data="" if flag.case_sensitive else "case_insensitive",
+                        content=flag,
+                        type="regex" if flag_def.regex else "static",
+                        data="" if flag_def.case_sensitive else "case_insensitive",
                     )
                 )
 
     return output, errors
 
 
-def post_create_flags(
-    reqs: typing.List[FlagCreateRequest], context: Context
+def send_flag_requests(
+    reqs: typing.List[FlagRequest], context: Context
 ) -> typing.Sequence[LibError]:
-    errors = []
+    errors: typing.List[LibError] = []
+
+    challenge_ids: typing.Set[int] = set()
+    for req in reqs:
+        challenge_ids.add(req.challenge)
+
+    for challenge_id in challenge_ids:
+        res = context.session.get("/flags", data={"challenge_id": challenge_id})
+
+        if res.status_code != 200:
+            continue
+
+        for flag_api in res.json()["data"]:
+            context.session.delete(f"/flags/{flag_api["id"]}")
 
     for i, req in enumerate(reqs):
         res = context.session.post(
             "/flags",
-            dataclasses.asdict(req),
+            data=dataclasses.asdict(req),
         )
 
-        if res.status_code != 200:
-            errors.append(
-                BuildError(
-                    context=f"Flag {i} of challenge {req.challenge}",
-                    msg="failed to created",
-                    error=ValueError(res.json()["message"]),
-                )
-            )
+        if res_errors := ctfd_errors(
+            res, context=f"Flag {i} of challenge {req.challenge}"
+        ):
+            errors += res_errors
             continue
 
     return errors
 
 
-def post_attachments(
+@dataclasses.dataclass
+class AttachmentRequest:
+    challenge: int
+    type: str
+    file_name: str
+    file_data: typing.BinaryIO
+
+
+def build_attachment_requests(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Sequence[LibError]:
+) -> typing.Tuple[typing.List[AttachmentRequest], typing.Sequence[LibError]]:
     errors: typing.List[LibError] = []
+    reqs: typing.List[AttachmentRequest] = []
 
     for id, challenge in zip(ids, track.challenges):
         for i, attachment in enumerate(challenge.attachments):
@@ -240,30 +265,62 @@ def post_attachments(
 
             name, fh = out
 
-            res = context.session.post_data(
-                "/files",
-                data={"challenge": id, "type": "challenge"},
-                files={"file": (name, fh)},
+            reqs.append(
+                AttachmentRequest(
+                    challenge=id, type="challenge", file_name=name, file_data=fh
+                )
             )
 
-            if res.status_code != 200:
-                errors.append(
-                    DeployError(
-                        context=f"Attachment {i} of challenge {id}",
-                        msg="failed to create",
-                        error=ValueError(res.json()["message"]),
-                    )
-                )
-                continue
+    return reqs, errors
+
+
+def send_attachment_requests(
+    reqs: typing.Sequence[AttachmentRequest], context: Context
+) -> typing.Sequence[LibError]:
+    errors: typing.List[LibError] = []
+
+    challenge_ids: typing.Set[int] = set()
+    for req in reqs:
+        challenge_ids.add(req.challenge)
+
+    for challenge_id in challenge_ids:
+        res = context.session.get(f"/challenges/{challenge_id}/files")
+
+        if res.status_code != 200:
+            continue
+
+        for files_api in res.json()["data"]:
+            context.session.delete(f"/files/{files_api["id"]}")
+
+    for i, req in enumerate(reqs):
+        res = context.session.post_data(
+            "/files",
+            data={"challenge": req.challenge, "type": req.type},
+            files={"file": (req.file_name, req.file_data)},
+        )
+
+        if res_errors := ctfd_errors(
+            res, context=f"Attachment {i} of challenge {req.challenge}"
+        ):
+            errors += res_errors
+            continue
 
     return errors
 
 
-def post_hints(
+@dataclasses.dataclass
+class HintRequest:
+    challenge_id: int
+    content: str
+    cost: int
+
+
+def build_hint_requests(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Sequence[LibError]:
+) -> typing.Tuple[typing.List[HintRequest], typing.Sequence[LibError]]:
     errors: typing.List[LibError] = []
 
+    reqs: typing.List[HintRequest] = []
     for id, challenge in zip(ids, track.challenges):
         for i, hint in enumerate(challenge.hints):
             content = build_translation(context.challenge_path, hint.texts)
@@ -275,25 +332,45 @@ def post_hints(
                 )
                 continue
 
-            res = context.session.post(
-                "/hints",
-                {"challenge_id": id, "content": content, "cost": hint.cost},
-            )
+            reqs.append(HintRequest(challenge_id=id, content=content, cost=hint.cost))
 
-            if res.status_code != 200:
-                errors.append(
-                    DeployError(
-                        context=f"Hint {i} of challenge {id}",
-                        msg="failed to create",
-                        error=ValueError(res.json()["message"]),
-                    )
-                )
-                continue
+    return reqs, errors
+
+
+def send_hint_requests(
+    reqs: typing.Sequence[HintRequest], context: Context
+) -> typing.Sequence[LibError]:
+    errors: typing.List[LibError] = []
+
+    challenge_ids: typing.Set[int] = set()
+    for req in reqs:
+        challenge_ids.add(req.challenge_id)
+
+    for challenge_id in challenge_ids:
+        res = context.session.get("/hints", data={"challenge_id": challenge_id})
+
+        if res.status_code != 200:
+            continue
+
+        for flag_api in res.json()["data"]:
+            context.session.delete(f"/hints/{flag_api["id"]}")
+
+    for i, req in enumerate(reqs):
+        res = context.session.post(
+            "/hints",
+            data=dataclasses.asdict(req),
+        )
+
+        if res_errors := ctfd_errors(
+            res, context=f"Hint {i} of challenge {req.challenge_id}"
+        ):
+            errors += res_errors
+            continue
 
     return errors
 
 
-def patch_references(
+def send_references(
     track: Track, ids: typing.List[int], context: Context
 ) -> typing.Sequence[LibError]:
     errors: typing.List[LibError] = []
@@ -315,17 +392,13 @@ def patch_references(
         if prerequisites:
             res = context.session.patch(
                 f"/challenges/{id}",
-                {"requirements": {"anonymize": True, "prerequisites": prerequisites}},
+                data={
+                    "requirements": {"anonymize": True, "prerequisites": prerequisites}
+                },
             )
 
-            if res.status_code != 200:
-                errors.append(
-                    DeployError(
-                        context=f"Challenge {id}",
-                        msg="failed to update prerequisites",
-                        error=ValueError(res.json()["message"]),
-                    )
-                )
+            if res_errors := ctfd_errors(res, context=f"Challenge {id}"):
+                errors += res_errors
                 continue
 
         if challenge.next is not None:
@@ -343,37 +416,39 @@ def patch_references(
                 {"next_id": ids[challenge.next]},
             )
 
-            if res.status_code != 200:
-                errors.append(
-                    DeployError(
-                        context=f"Challenge {id}",
-                        msg="failed to update next",
-                        error=ValueError(res.json()["message"]),
-                    )
-                )
+            if res_errors := ctfd_errors(res, context=f"Challenge {id}"):
+                errors += res_errors
                 continue
 
     return errors
 
 
 def deploy_challenge(track: Track, context: Context) -> typing.Sequence[LibError]:
-    create_requests, errors = build_create_challenges(track, context)
+    create_requests, errors = build_challenge_requests(track, context)
     if errors:
         return errors
 
-    challenge_ids, errors = post_create_challenges(create_requests, context)
+    challenge_ids, errors = send_challenge_requests(create_requests, context)
     if errors:
         return errors
 
     all_errors: typing.List[LibError] = []
 
-    flag_requests, errors = build_create_flags(track, challenge_ids, context)
+    flag_requests, errors = build_flag_requests(track, challenge_ids, context)
     all_errors += errors
+    all_errors += send_flag_requests(flag_requests, context)
 
-    all_errors += post_create_flags(flag_requests, context)
-    all_errors += post_attachments(track, challenge_ids, context)
-    all_errors += post_hints(track, challenge_ids, context)
-    all_errors += patch_references(track, challenge_ids, context)
+    attachment_requests, errors = build_attachment_requests(
+        track, challenge_ids, context
+    )
+    all_errors += errors
+    all_errors += send_attachment_requests(attachment_requests, context)
+
+    hint_requests, errors = build_hint_requests(track, challenge_ids, context)
+    all_errors += errors
+    all_errors += send_hint_requests(hint_requests, context)
+
+    all_errors += send_references(track, challenge_ids, context)
 
     return all_errors
 
@@ -415,7 +490,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     return cli_challenge_wrapper(
         root_directory=cli_context.root_directory,
-        challenges=args.challenge,
+        challenges=args.challenge if args.challenge else None,
         context=context,
         callback=deploy_challenge,
         console=cli_context.console,

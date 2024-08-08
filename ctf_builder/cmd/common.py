@@ -170,7 +170,9 @@ def cli_challenge_wrapper(
     callback: typing.Callable[[Track, WC], typing.Sequence[LibError]],
     console: typing.Optional[rich.console.Console] = None,
 ) -> bool:
-    if not challenges:
+    skip_inactive = challenges is None
+
+    if challenges is None:
         next_challenges = get_challenges(root_directory)
         if next_challenges is None:
             print_errors(
@@ -188,8 +190,6 @@ def cli_challenge_wrapper(
             return False
 
         challenges = next_challenges
-
-    skip_inactive = True if len(challenges) <= 1 else False
 
     error_map: typing.Dict[str, typing.List[LibError]] = {}
     threads: typing.List[typing.Tuple[threading.Thread, str]] = []

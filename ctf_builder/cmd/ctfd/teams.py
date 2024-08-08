@@ -132,8 +132,8 @@ def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
             data=user.to_api(),
         )
 
-    if errors := ctfd_errors(res, context=f"User {user.name}"):
-        return errors
+    if res_errors := ctfd_errors(res, context=f"User {user.name}"):
+        return res_errors
 
     data = res.json()["data"]
     user.id = data["id"]
@@ -178,24 +178,24 @@ def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
             data=team.to_api(),
         )
 
-    if errors := ctfd_errors(res, context="Team"):
-        return errors
+    if res_errors := ctfd_errors(res, context="Team"):
+        return res_errors
 
     data = res.json()["data"]
     team_id = data["id"]
 
     team.id = team_id
 
-    all_errors: typing.List[LibError] = []
+    errors: typing.List[LibError] = []
     for user in team.users:
         user_errors = deploy_user(user, context)
         if user_errors:
-            all_errors += user_errors
+            errors += user_errors
             continue
 
-        all_errors += add_user_to_team(team.id, user.id, context)
+        errors += add_user_to_team(team.id, user.id, context)
 
-    return all_errors
+    return errors
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
