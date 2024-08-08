@@ -174,7 +174,7 @@ def __parse_type(
                         ParseError(
                             path=f"{key_path}.{data_field.name}",
                             expected=__expected(data_field.type),
-                            comment=comment,
+                            comment=data_field.metadata.get(COMMENT_FIELD_NAME),
                         )
                     ]
                 else:
