@@ -69,21 +69,6 @@ def port_generator(port: int) -> typing.Generator[typing.Optional[int], None, No
         yield None
 
 
-def build_connection_string(
-    host: str, port: int, protocol: PortProtocol, path: typing.Optional[str] = None
-) -> str:
-    if protocol is PortProtocol.HTTP:
-        return f"http://{host}:{port}{path}"
-    elif protocol is PortProtocol.HTTPS:
-        return f"https://{host}:{port}{path}"
-    elif protocol is PortProtocol.TCP:
-        return f"nc {host} {port}"
-    elif protocol is PortProtocol.UDP:
-        return f"nc -u {host} {port}"
-
-    assert False, f"unhandled {protocol}"
-
-
 def get_network(
     client: docker.DockerClient, name: typing.Optional[str] = None
 ) -> typing.Optional[docker.models.networks.Network]:

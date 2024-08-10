@@ -161,6 +161,26 @@ class PortProtocol(enum.Enum):
     HTTPS = "https"
     TCP = "tcp"
     UDP = "udp"
+    WS = "ws"
+    WSS = "wss"
+
+    def connection_string(
+        self, host: str, port: int, path: typing.Optional[str] = None
+    ) -> str:
+        if self is PortProtocol.HTTP:
+            return f"http://{host}:{port}{path}"
+        elif self is PortProtocol.HTTPS:
+            return f"https://{host}:{port}{path}"
+        elif self is PortProtocol.TCP:
+            return f"nc {host} {port}"
+        elif self is PortProtocol.UDP:
+            return f"nc -u {host} {port}"
+        elif self is PortProtocol.WS:
+            return f"ws://{host}:{port}{path}"
+        elif self is PortProtocol.WSS:
+            return f"wss://{host}:{port}{path}"
+
+        assert False, f"unhandled {self}"
 
 
 @dataclasses.dataclass(frozen=True)
