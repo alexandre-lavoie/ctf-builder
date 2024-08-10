@@ -5,10 +5,10 @@ import typing
 import docker
 import docker.models.networks
 
-from ..build.deployer import BuildDeployer, DeployContext
 from ..config import DEPLOY_NETWORK
 from ..error import DeployError, LibError, SkipError, print_errors
-from ..schema import Track
+from ..models.challenge import Track
+from ..models.deploy.base import DeployContext
 from .common import (
     CliContext,
     WrapContext,
@@ -38,11 +38,10 @@ def stop(track: Track, context: Context) -> typing.Sequence[LibError]:
 
     errors: typing.List[LibError] = []
     for i, deployer in enumerate(track.deploy):
-        errors += BuildDeployer.get(deployer).stop(
-            deployer=deployer,
-            context=DeployContext(
+        errors += deployer.stop(
+            DeployContext(
                 name=f"{track.tag or track.name}_{i}",
-                path=context.challenge_path,
+                root=context.challenge_path,
                 docker_client=context.docker_client,
                 network=context.network.name,
             ),

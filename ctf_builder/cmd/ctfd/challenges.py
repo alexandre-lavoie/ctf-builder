@@ -2,14 +2,14 @@ import argparse
 import dataclasses
 import typing
 
-from ...build.attachment import BuildAttachment
-from ...build.deployer import BuildDeployer
-from ...build.flag import BuildFlag
-from ...build.translation import BuildTranslation
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
 from ...ctfd import CTFdAPI, ctfd_errors
 from ...error import BuildError, DeployError, LibError
-from ...schema import PortProtocol, Track, Translation
+from ...models.attachment import AttachmentContext
+from ...models.challenge import Track
+from ...models.flag import FlagContext
+from ...models.port import ConnectionContext, Port
+from ...models.text import Text, TextContext
 from ..common import (
     CliContext,
     WrapContext,
@@ -44,21 +44,6 @@ class ChallengeRequest:
     connection_info: typing.Optional[str] = dataclasses.field(default=None)
 
 
-def build_translation(
-    root: str, translations: typing.Sequence[Translation]
-) -> typing.Optional[str]:
-    priority_texts = []
-    for translation in translations:
-        build = BuildTranslation.get(translation)
-
-        if (text := build.build(root, translation)) is None:
-            return None
-
-        priority_texts.append((build.priority(), text))
-
-    return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
-
-
 def build_challenge_requests(
     track: Track, context: Context
 ) -> typing.Tuple[typing.List[ChallengeRequest], typing.Sequence[LibError]]:
@@ -69,11 +54,11 @@ def build_challenge_requests(
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    deploy_ports_list: typing.List[typing.List[typing.Tuple[PortProtocol, int]]] = []
+    deploy_ports_list: typing.List[typing.List[typing.Tuple[Port, int]]] = []
     for deployer in track.deploy:
-        ports: typing.List[typing.Tuple[PortProtocol, int]] = []
-        for protocol, _ in BuildDeployer.get(deployer).ports(deployer):
-            ports.append((protocol, base_port))
+        ports: typing.List[typing.Tuple[Port, int]] = []
+        for port in deployer.get_ports():
+            ports.append((port, base_port))
             base_port += 1
         deploy_ports_list.append(ports)
 
@@ -82,8 +67,11 @@ def build_challenge_requests(
         if challenge.name:
             name += f" - {challenge.name}"
 
-        description = build_translation(context.challenge_path, challenge.descriptions)
-        if description is None:
+        if (
+            description := Text.build_many(
+                challenge.descriptions, TextContext(root=context.challenge_path)
+            )
+        ) is None:
             errors.append(
                 BuildError(context=f"Challenge {i}", msg="has an invalid description")
             )
@@ -110,11 +98,13 @@ def build_challenge_requests(
                 )
                 continue
 
-            protocol, port_value = deploy_ports[0]
-            connection_info = protocol.connection_string(
-                host=CHALLENGE_HOST,
-                port=port_value,
-                path=challenge.host.path,
+            port, port_value = deploy_ports[0]
+            connection_info = port.connection_string(
+                ConnectionContext(
+                    host=CHALLENGE_HOST,
+                    port=port_value,
+                    path=challenge.host.path,
+                )
             )
         else:
             connection_info = None
@@ -185,7 +175,7 @@ def build_flag_requests(
 
     for id, challenge in zip(ids, track.challenges):
         for flag_def in challenge.flags:
-            for flag in BuildFlag.build(context.challenge_path, flag_def):
+            for flag in flag_def.build(FlagContext(root=context.challenge_path)):
                 output.append(
                     FlagRequest(
                         challenge=id,
@@ -248,8 +238,8 @@ def build_attachment_requests(
     for id, challenge in zip(ids, track.challenges):
         for i, attachment in enumerate(challenge.attachments):
             if (
-                out := BuildAttachment.get(attachment).build(
-                    context.challenge_path, attachment
+                handle := attachment.build(
+                    AttachmentContext(root=context.challenge_path)
                 )
             ) is None:
                 errors.append(
@@ -259,11 +249,12 @@ def build_attachment_requests(
                 )
                 continue
 
-            name, fh = out
-
             reqs.append(
                 AttachmentRequest(
-                    challenge=id, type="challenge", file_name=name, file_data=fh
+                    challenge=id,
+                    type="challenge",
+                    file_name=handle.name,
+                    file_data=handle.data,
                 )
             )
 
@@ -319,7 +310,9 @@ def build_hint_requests(
     reqs: typing.List[HintRequest] = []
     for id, challenge in zip(ids, track.challenges):
         for i, hint in enumerate(challenge.hints):
-            content = build_translation(context.challenge_path, hint.texts)
+            content = Text.build_many(
+                hint.texts, TextContext(root=context.challenge_path)
+            )
             if content is None:
                 errors.append(
                     BuildError(

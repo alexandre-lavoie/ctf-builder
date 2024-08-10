@@ -1,106 +1,69 @@
-import abc
-import dataclasses
 import os.path
 import typing
 
-import docker
 import docker.errors
-import docker.types
+import pydantic
 
-from ..error import BuildError, DeployError, LibError, SkipError
-from ..schema import Deployer, DeployerDocker, PortProtocol
-
-from .args import BuildArgs
-from .utils import subclass_get, to_docker_tag
-
-
-T = typing.TypeVar("T", bound=Deployer)
-
-
-def default_port_generator() -> typing.Generator[typing.Optional[int], None, None]:
-    while True:
-        yield None
+from ...docker import to_docker_tag
+from ...error import BuildError, DeployError, LibError, SkipError
+from ..arguments import ArgumentContext, Arguments
+from ..healthcheck import Healthcheck
+from ..path import FilePath, PathContext
+from ..port import Port
+from .base import BaseDeploy, DeployContext
 
 
-@dataclasses.dataclass
-class DeployContext:
-    name: str
-    path: str
-    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
-        default=None
+class DeployDocker(BaseDeploy):
+    """
+    Deployment using Docker.
+    """
+
+    type: typing.Literal["docker"]
+    name: typing.Optional[str] = pydantic.Field(
+        default=None, description="Hostname on network"
     )
-    network: typing.Optional[str] = dataclasses.field(default=None)
-    host: typing.Optional[str] = dataclasses.field(default=None)
-    port_generator: typing.Generator[typing.Optional[int], None, None] = (
-        dataclasses.field(default_factory=lambda: default_port_generator())
+    path: typing.Optional[FilePath] = pydantic.Field(
+        default=None, description="Path to Dockerfile"
+    )
+    args: typing.List[Arguments] = pydantic.Field(
+        default_factory=list,
+        description="Build arguments for Dockerfile",
+        discriminator="type",
+    )
+    env: typing.List[Arguments] = pydantic.Field(
+        default_factory=list,
+        description="Environments for Dockerfile",
+        discriminator="type",
+    )
+    ports: typing.List[Port] = pydantic.Field(
+        default_factory=list, description="Ports for deployment", discriminator="type"
+    )
+    healthcheck: typing.Optional[Healthcheck] = pydantic.Field(
+        default=None, description=("Healtcheck for Dockerfile")
     )
 
-
-class BuildDeployer(typing.Generic[T], abc.ABC):
-    @classmethod
-    def get(cls, obj: Deployer) -> typing.Type["BuildDeployer[typing.Any]"]:
-        return subclass_get(cls, obj)
-
-    @classmethod
-    @abc.abstractmethod
-    def ports(cls, deployer: T) -> typing.Sequence[typing.Tuple[PortProtocol, int]]:
-        pass
-
-    @classmethod
-    @abc.abstractmethod
-    def has_healthcheck(cls, context: DeployContext, deployer: T) -> bool:
-        pass
-
-    @classmethod
-    @abc.abstractmethod
-    def is_healthy(cls, context: DeployContext, deployer: T) -> bool:
-        pass
-
-    @classmethod
-    @abc.abstractmethod
-    def start(
-        cls, context: DeployContext, deployer: T, skip_reuse: bool = True
-    ) -> typing.Sequence[LibError]:
-        pass
-
-    @classmethod
-    @abc.abstractmethod
-    def stop(
-        cls, context: DeployContext, deployer: T, skip_not_found: bool = True
-    ) -> typing.Sequence[LibError]:
-        pass
-
-
-class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
-    @classmethod
-    def get_dns_name(cls, context: DeployContext) -> str:
+    def get_dns_name(self, context: DeployContext) -> str:
         return to_docker_tag(context.name)
 
-    @classmethod
-    def get_container_name(cls, context: DeployContext) -> str:
+    def get_container_name(self, context: DeployContext) -> str:
         if context.network:
             return to_docker_tag(f"{context.network}_{context.name}")
 
-        return cls.get_dns_name(context)
+        return self.get_dns_name(context)
 
-    @classmethod
-    def ports(
-        cls, deployer: DeployerDocker
-    ) -> typing.Sequence[typing.Tuple[PortProtocol, int]]:
-        return [(port.protocol, port.port) for port in deployer.ports]
+    def get_ports(self) -> typing.Sequence[Port]:
+        return self.ports
 
-    @classmethod
-    def has_healthcheck(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
-        return deployer.healthcheck is not None
+    def has_healthcheck(self, context: DeployContext) -> bool:
+        return self.healthcheck is not None
 
-    @classmethod
-    def is_healthy(cls, context: DeployContext, deployer: DeployerDocker) -> bool:
+    def is_healthy(self, context: DeployContext) -> bool:
         if context.docker_client is None:
             return False
 
         try:
             container = context.docker_client.containers.get(
-                cls.get_container_name(context)
+                self.get_container_name(context)
             )
         except:
             return False
@@ -110,18 +73,17 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
 
         return status == "running" and health == "healthy"
 
-    @classmethod
     def start(
-        cls, context: DeployContext, deployer: DeployerDocker, skip_reuse: bool = True
+        self, context: DeployContext, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="client not initialized")]
 
         dockerfile: typing.Optional[str]
-        if deployer.path is None:
-            dockerfile = os.path.join(context.path, "Dockerfile")
+        if self.path is None:
+            dockerfile = os.path.join(context.root, "Dockerfile")
         else:
-            dockerfile = deployer.path.resolve(context.path)
+            dockerfile = self.path.resolve(PathContext(root=context.root))
 
         if dockerfile is None or not os.path.isfile(dockerfile):
             return [BuildError(context="Dockerfile", msg="is not a file")]
@@ -130,8 +92,8 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
 
         errors: typing.List[LibError] = []
         build_args = {}
-        for args in deployer.args:
-            if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
+        for args in self.args:
+            if (arg_map := args.build(ArgumentContext(root=context.root))) is None:
                 errors.append(
                     BuildError(context=context.name, msg="invalid build args")
                 )
@@ -141,8 +103,8 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
                 build_args[key] = value
 
         environment = {}
-        for env in deployer.env:
-            if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
+        for env in self.env:
+            if (arg_map := env.build(ArgumentContext(root=context.root))) is None:
                 errors.append(
                     BuildError(context=context.name, msg="invalid environment")
                 )
@@ -164,23 +126,23 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
 
         port_bindings = {}
         if context.host:
-            for port in deployer.ports:
-                port_bindings[port.port] = (context.host, next(context.port_generator))
+            for port in self.ports:
+                port_bindings[port.value] = (context.host, next(context.port_generator))
 
         if errors:
             return errors
 
         aliases = []
 
-        dns_name = cls.get_dns_name(context)
+        dns_name = self.get_dns_name(context)
         aliases.append(dns_name)
 
-        container_name = cls.get_container_name(context)
+        container_name = self.get_container_name(context)
         if container_name != dns_name:
             aliases.append(container_name)
 
-        if deployer.name:
-            aliases.append(to_docker_tag(deployer.name))
+        if self.name:
+            aliases.append(to_docker_tag(self.name))
 
         try:
             context.docker_client.containers.run(
@@ -197,15 +159,15 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
                 },
                 healthcheck=(
                     {
-                        "test": deployer.healthcheck.test,
-                        "interval": int(deployer.healthcheck.interval * 1_000_000_000),
-                        "timeout": int(deployer.healthcheck.timeout * 1_000_000_000),
-                        "retries": deployer.healthcheck.retries,
+                        "test": self.healthcheck.test,
+                        "interval": int(self.healthcheck.interval * 1_000_000_000),
+                        "timeout": int(self.healthcheck.timeout * 1_000_000_000),
+                        "retries": self.healthcheck.retries,
                         "start_period": int(
-                            deployer.healthcheck.start_period * 1_000_000_000
+                            self.healthcheck.start_period * 1_000_000_000
                         ),
                     }
-                    if deployer.healthcheck
+                    if self.healthcheck
                     else None
                 ),
             )
@@ -232,16 +194,15 @@ class BuildDeployerDocker(BuildDeployer[DeployerDocker]):
 
         return errors
 
-    @classmethod
     def stop(
-        cls, context: DeployContext, deployer: Deployer, skip_not_found: bool = True
+        self, context: DeployContext, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="client not initialized")]
 
         try:
             container = context.docker_client.containers.get(
-                cls.get_container_name(context)
+                self.get_container_name(context)
             )
 
             container.remove(force=True)

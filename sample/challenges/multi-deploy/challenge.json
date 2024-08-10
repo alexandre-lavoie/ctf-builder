@@ -12,11 +12,11 @@
       },
       "descriptions": [
         {
-          "$type": "english",
+          "language": "en",
           "path": "text/CHAL-EN.md"
         },
         {
-          "$type": "french",
+          "language": "fr",
           "path": "text/CHAL-FR.md"
         }
       ],
@@ -25,7 +25,7 @@
           "case_sensitive": true,
           "regex": false,
           "values": {
-            "$type": "env",
+            "type": "env",
             "path": "FLAG",
             "keys": [
               "FLAG"
@@ -35,7 +35,7 @@
       ],
       "attachments": [
         {
-          "$type": "directory",
+          "type": "directory",
           "path": "challenge",
           "name": "source.zip"
         }
@@ -45,11 +45,11 @@
           "cost": 0,
           "texts": [
             {
-              "$type": "english",
+              "language": "en",
               "path": "text/HINT-EN.md"
             },
             {
-              "$type": "french",
+              "language": "fr",
               "path": "text/HINT-FR.md"
             }
           ]
@@ -59,12 +59,12 @@
   ],
   "deploy": [
     {
-      "$type": "docker",
+      "type": "docker",
       "name": "multi-deploy-app",
       "path": "challenge/server/Dockerfile",
       "env": [
         {
-          "$type": "env",
+          "type": "env",
           "path": "FLAG",
           "keys": [
             "FLAG"
@@ -79,13 +79,13 @@
       }
     },
     {
-      "$type": "docker",
+      "type": "docker",
       "name": "multi-deploy-proxy",
       "path": "challenge/proxy/Dockerfile",
       "ports": [
         {
-          "port": 9001,
-          "protocol": "tcp"
+          "type": "tcp",
+          "value": 9001
         }
       ],
       "healthcheck": {
@@ -98,7 +98,7 @@
   ],
   "test": [
     {
-      "$type": "docker",
+      "type": "docker",
       "path": "Dockerfile.test"
     }
   ]

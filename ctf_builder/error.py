@@ -41,8 +41,7 @@ class TestError(LibError):
 @dataclasses.dataclass
 class ParseError(LibError):
     path: str
-    expected: typing.List[str]
-    comment: typing.Optional[str]
+    msg: str
 
 
 @dataclasses.dataclass
@@ -111,14 +110,9 @@ def print_errors(
     for error in errors:
         if isinstance(error, ParseError):
             path = rich.markup.escape(error.path)
-            expected = ", ".join(f"[blue]{v}[/]" for v in error.expected)
+            msg = rich.markup.escape(error.msg)
 
-            if error.comment:
-                comment = f" [bright_black]({rich.markup.escape(error.comment)})[/]"
-            else:
-                comment = ""
-
-            parse_tree.add(f"[red]{path}[/] is not {expected}{comment}")
+            parse_tree.add(f"[red]{path}[/] {msg}")
         elif isinstance(error, (BuildError, DeployError)):
             if isinstance(error, DeployError):
                 target_tree = deploy_tree
