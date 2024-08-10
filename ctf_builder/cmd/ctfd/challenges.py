@@ -219,7 +219,7 @@ def send_flag_requests(
             continue
 
         for flag_api in res.json()["data"]:
-            context.session.delete(f"/flags/{flag_api["id"]}")
+            context.session.delete(f"/flags/{flag_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post(
@@ -291,7 +291,7 @@ def send_attachment_requests(
             continue
 
         for files_api in res.json()["data"]:
-            context.session.delete(f"/files/{files_api["id"]}")
+            context.session.delete(f"/files/{files_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post_data(
@@ -354,7 +354,7 @@ def send_hint_requests(
             continue
 
         for flag_api in res.json()["data"]:
-            context.session.delete(f"/hints/{flag_api["id"]}")
+            context.session.delete(f"/hints/{flag_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post(
