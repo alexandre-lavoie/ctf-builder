@@ -5,10 +5,9 @@ import os.path
 import time
 import typing
 
-import requests
-
-from ...ctfd import read_nonce
-from ...error import DeployError, LibError, get_exit_status, print_errors
+from ...ctfd.api import CTFdAPI
+from ...ctfd.models import CTFdSetup
+from ...error import LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 
@@ -30,99 +29,7 @@ class Context:
     file: str
 
 
-@dataclasses.dataclass
-class SetupFiles:
-    ctf_logo: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
-    ctf_banner: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
-    ctf_small_icon: typing.Optional[typing.BinaryIO] = dataclasses.field(default=None)
-
-    @classmethod
-    def from_dict(
-        cls, directory: str, data: typing.Dict[str, typing.Any]
-    ) -> "SetupFiles":
-        fields: typing.Dict[str, typing.BinaryIO] = {}
-
-        for field in dataclasses.fields(cls):
-            field_value = data.get(field.name)
-            if not isinstance(field_value, str):
-                continue
-
-            path = os.path.join(directory, field_value)
-
-            if not (os.path.exists(path) and os.path.isfile(path)):
-                continue
-
-            fields[field.name] = open(path, "rb")
-
-        return cls(**fields)
-
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
-        out = {}
-
-        for field in dataclasses.fields(SetupFiles):
-            out[field.name] = getattr(self, field.name)
-
-        return out
-
-
-@dataclasses.dataclass
-class SetupData:
-    ctf_name: str
-    ctf_description: str
-    user_mode: str
-    challenge_visibility: str
-    score_visibility: str
-    account_visibility: str
-    registration_visibility: str
-    verify_emails: bool
-    name: str = dataclasses.field(default="")
-    email: str = dataclasses.field(default="")
-    password: str = dataclasses.field(default="")
-    ctf_theme: str = dataclasses.field(default="core-beta")
-    theme_color: str = dataclasses.field(default="")
-    start: str = dataclasses.field(default="")
-    end: str = dataclasses.field(default="")
-    nonce: str = dataclasses.field(default="")
-    team_size: int = dataclasses.field(default=0)
-
-    @classmethod
-    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "SetupData":
-        fields = {}
-
-        for field in dataclasses.fields(cls):
-            value = data.get(field.name)
-            if value is None:
-                continue
-
-            fields[field.name] = field.type(value)
-
-        return cls(**fields)
-
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
-        out = {}
-
-        for field in dataclasses.fields(SetupData):
-            out[field.name] = getattr(self, field.name)
-
-        return out
-
-
-@dataclasses.dataclass
-class Setup:
-    data: SetupData
-    files: SetupFiles
-
-    @classmethod
-    def from_dict(cls, directory: str, data: typing.Dict[str, typing.Any]) -> "Setup":
-        return Setup(
-            data=SetupData.from_dict(data), files=SetupFiles.from_dict(directory, data)
-        )
-
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
-        return {"data": self.data.to_dict(), "files": self.files.to_dict()}
-
-
-def make_setup(file: str, name: str, email: str, password: str) -> Setup:
+def make_setup(file: str, name: str, email: str, password: str) -> CTFdSetup:
     with open(file, "r") as h:
         config = json.load(h)
 
@@ -130,33 +37,13 @@ def make_setup(file: str, name: str, email: str, password: str) -> Setup:
     config["email"] = email
     config["password"] = password
 
-    directory = os.path.dirname(file)
-
-    return Setup.from_dict(directory, config)
+    return CTFdSetup(**config)
 
 
 def setup(context: Context) -> typing.Sequence[LibError]:
-    setup = make_setup(context.file, context.name, context.email, context.password)
+    data = make_setup(context.file, context.name, context.email, context.password)
 
-    sess = requests.Session()
-
-    if (nonce := read_nonce(sess, f"{context.url}/setup")) is None:
-        return [DeployError(context="nonce", msg="failed to get")]
-
-    setup.data.nonce = nonce
-
-    res = sess.post(f"{context.url}/setup", **setup.to_dict())
-
-    if res.status_code != 200:
-        return [
-            DeployError(
-                context="setup",
-                msg="failed to deploy",
-                error=ValueError(res.json()["message"]),
-            )
-        ]
-
-    return []
+    return CTFdAPI.setup(context.url, data, root=os.path.dirname(context.file))
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:

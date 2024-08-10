@@ -5,8 +5,10 @@ import os.path
 import typing
 import uuid
 
-from ...ctfd import CTFdAPI, ctfd_errors
-from ...error import LibError, get_exit_status, print_errors
+from ...ctfd.api import CTFdAPI
+from ...ctfd.models import CTFdAccessToken, CTFdTeam, CTFdUser
+from ...ctfd.session import CTFdSession
+from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import CliContext
 
 
@@ -20,123 +22,54 @@ class Args:
 
 @dataclasses.dataclass(frozen=True)
 class Context:
-    session: CTFdAPI
+    api: CTFdAPI
 
 
 @dataclasses.dataclass
-class User:
-    name: str
-    email: str
-    id: int = dataclasses.field(default=-1)
-    password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
-    banned: bool = dataclasses.field(default=False)
-    hidden: bool = dataclasses.field(default=False)
-    type: str = dataclasses.field(default="user")
-    verified: bool = dataclasses.field(default=True)
-
-    @classmethod
-    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "User":
-        fields = {}
-
-        for field in dataclasses.fields(cls):
-            value = data.get(field.name)
-            if value is None:
-                continue
-
-            fields[field.name] = field.type(value)
-
-        return cls(**fields)
-
-    def to_api(self) -> typing.Dict[str, typing.Any]:
-        d = self.to_dict()
-
-        del d["id"]
-
-        return d
-
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
-        out = {}
-
-        for field in dataclasses.fields(User):
-            out[field.name] = getattr(self, field.name)
-
-        return out
+class TeamFile:
+    team: CTFdTeam
+    users: typing.List[CTFdUser]
 
 
-@dataclasses.dataclass
-class Team:
-    name: str
-    email: str
-    id: int = dataclasses.field(default=-1)
-    password: str = dataclasses.field(default_factory=lambda: str(uuid.uuid4()))
-    banned: bool = dataclasses.field(default=False)
-    hidden: bool = dataclasses.field(default=False)
-    users: typing.Sequence[User] = dataclasses.field(default_factory=list)
-
-    @classmethod
-    def from_dict(cls, data: typing.Dict[str, typing.Any]) -> "Team":
-        fields = {}
-
-        for field in dataclasses.fields(cls):
-            value = data.get(field.name)
-            if value is None:
-                continue
-
-            fields[field.name] = value
-
-        fields["users"] = [User.from_dict(user) for user in (data.get("users") or [])]
-
-        return cls(**fields)
-
-    def to_api(self) -> typing.Dict[str, typing.Any]:
-        d = self.to_dict()
-
-        del d["id"]
-        del d["users"]
-
-        return d
-
-    def to_dict(self) -> typing.Dict[str, typing.Any]:
-        out = {}
-
-        for field in dataclasses.fields(Team):
-            out[field.name] = getattr(self, field.name)
-
-        out["users"] = [user.to_dict() for user in self.users]
-
-        return out
-
-
-def make_teams(file: str) -> typing.List[Team]:
+def make_teams(file: str) -> typing.List[TeamFile]:
     with open(file, "r") as h:
         data = json.load(h)
 
-    return [Team.from_dict(team) for team in data["teams"]]
+    teams = []
+    for team in data["teams"]:
+        team["id"] = -1
+        ctfd_team = CTFdTeam(**team)
+
+        users = []
+        for user in team["users"]:
+            user["id"] = -1
+            ctfd_user = CTFdUser(**user)
+
+            users.append(ctfd_user)
+
+        teams.append(TeamFile(team=ctfd_team, users=users))
+
+    return teams
 
 
-def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
-    res = context.session.get("/users", data={"q": user.email})
+def deploy_user(user: CTFdUser, context: Context) -> typing.Sequence[LibError]:
+    data, _ = context.api.get_users_by_query(user.email or "")
 
-    user_api = None
-    if res.status_code == 200:
-        data = res.json()["data"]
+    res_errors: typing.Sequence[LibError]
+    if data:
+        user.id = data[0].id
 
-        if len(data) == 1:
-            user_api = data[0]
-
-    if user_api:
-        res = context.session.patch(f"/users/{user_api['id']}", data=user.to_api())
+        res, res_errors = context.api.update_user(user)
     else:
-        res = context.session.post(
-            "/users",
-            data=user.to_api(),
-        )
+        if not user.password:
+            user.password = str(uuid.uuid4())
 
-    if res_errors := ctfd_errors(res, context=f"User {user.name}"):
+        res, res_errors = context.api.create_user(user)
+
+    if res is None:
         return res_errors
 
-    data = res.json()["data"]
-    user.id = data["id"]
+    user.id = res.id
 
     return []
 
@@ -144,77 +77,53 @@ def deploy_user(user: User, context: Context) -> typing.Sequence[LibError]:
 def add_user_to_team(
     team_id: int, user_id: int, context: Context
 ) -> typing.Sequence[LibError]:
-    res = context.session.get(f"/teams/{team_id}/members")
+    user_ids, _ = context.api.get_users_in_team(team_id)
 
-    if res.status_code == 200:
-        user_ids = set(res.json()["data"])
+    if user_ids and user_id in user_ids:
+        return []
 
-        if user_id in user_ids:
-            return []
+    is_ok = context.api.add_user_to_team(team_id, user_id)
 
-    res = context.session.post(
-        f"/teams/{team_id}/members",
-        data={"user_id": user_id},
+    return (
+        []
+        if is_ok
+        else [
+            DeployError(
+                context=f"User {user_id}", msg=f"failed to add to team {team_id}"
+            )
+        ]
     )
 
-    return ctfd_errors(res, context=f"User {user_id}")
 
+def deploy_team(team_file: TeamFile, context: Context) -> typing.Sequence[LibError]:
+    data, _ = context.api.get_teams_by_query(team_file.team.email or "")
 
-def deploy_team(team: Team, context: Context) -> typing.Sequence[LibError]:
-    res = context.session.get("/teams", data={"q": team.email})
+    res_errors: typing.Sequence[LibError]
+    if data:
+        team_file.team.id = data[0].id
 
-    team_api = None
-    if res.status_code == 200:
-        data = res.json()["data"]
-
-        if len(data) == 1:
-            team_api = data[0]
-
-    if team_api:
-        res = context.session.patch(f"/teams/{team_api['id']}", data=team.to_api())
+        res, res_errors = context.api.update_team(team_file.team)
     else:
-        res = context.session.post(
-            "/teams",
-            data=team.to_api(),
-        )
+        if not team_file.team.password:
+            team_file.team.password = str(uuid.uuid4())
 
-    if res_errors := ctfd_errors(res, context="Team"):
+        res, res_errors = context.api.create_team(team_file.team)
+
+    if res is None:
         return res_errors
 
-    data = res.json()["data"]
-    team_id = data["id"]
-
-    team.id = team_id
+    team_file.team.id = res.id
 
     errors: typing.List[LibError] = []
-    for user in team.users:
+    for user in team_file.users:
         user_errors = deploy_user(user, context)
         if user_errors:
             errors += user_errors
             continue
 
-        errors += add_user_to_team(team.id, user.id, context)
+        errors += add_user_to_team(team_file.team.id, user.id, context)
 
     return errors
-
-
-def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
-    parser.add_argument("-k", "--api_key", help="API Key", required=True)
-    parser.add_argument(
-        "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
-    )
-    parser.add_argument(
-        "-f",
-        "--file",
-        help="Config file path",
-        default=os.path.join(root_directory, "ctfd", "teams.json"),
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        help="Output file",
-        default=os.path.join(root_directory, "ctfd", "teams.out.json"),
-    )
 
 
 def merge_teams_json(
@@ -245,28 +154,61 @@ def merge_teams_json(
     return out
 
 
+def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
+    parser.add_argument("-k", "--api_key", help="API Key", required=True)
+    parser.add_argument(
+        "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
+    )
+    parser.add_argument(
+        "-f",
+        "--file",
+        help="Config file path",
+        default=os.path.join(root_directory, "ctfd", "teams.json"),
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        help="Output file",
+        default=os.path.join(root_directory, "ctfd", "teams.out.json"),
+    )
+
+
 def cli(args: Args, cli_context: CliContext) -> bool:
     teams = make_teams(args.file)
 
-    context = Context(session=CTFdAPI(args.url, args.api_key))
+    context = Context(
+        CTFdAPI(
+            CTFdSession(
+                url=args.url, access_token=CTFdAccessToken(id=-1, value=args.api_key)
+            )
+        )
+    )
 
     all_errors: typing.List[LibError] = []
 
-    out_teams: typing.List[Team] = []
-    for team in teams:
-        errors = deploy_team(team, context)
+    out_teams: typing.List[TeamFile] = []
+    for team_file in teams:
+        errors = deploy_team(team_file, context)
         all_errors += errors
 
         print_errors(
-            prefix=[team.name],
+            prefix=[team_file.team.name or "team"],
             errors=errors,
             console=cli_context.console,
         )
 
         if not errors:
-            out_teams.append(team)
+            out_teams.append(team_file)
 
-    out_json = {"teams": [team.to_dict() for team in out_teams]}
+    out_json = {
+        "teams": [
+            {
+                **team_file.team.model_dump(mode="json"),
+                "users": [user.model_dump(mode="json") for user in team_file.users],
+            }
+            for team_file in out_teams
+        ]
+    }
 
     if os.path.isfile(args.output):
         with open(args.output) as h:
