@@ -1,8 +1,5 @@
 import argparse
 import dataclasses
-import glob
-import os
-import os.path
 import typing
 
 from ...build.attachment import BuildAttachment
@@ -12,11 +9,10 @@ from ...build.translation import BuildTranslation
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
 from ...ctfd import CTFdAPI, ctfd_errors
 from ...error import BuildError, DeployError, LibError
-from ...schema import Track, Translation
+from ...schema import PortProtocol, Track, Translation
 from ..common import (
     CliContext,
     WrapContext,
-    build_connection_string,
     cli_challenge_wrapper,
     get_challenge_index,
     get_challenges,
@@ -73,9 +69,9 @@ def build_challenge_requests(
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    deploy_ports_list = []
+    deploy_ports_list: typing.List[typing.List[typing.Tuple[PortProtocol, int]]] = []
     for deployer in track.deploy:
-        ports = []
+        ports: typing.List[typing.Tuple[PortProtocol, int]] = []
         for protocol, _ in BuildDeployer.get(deployer).ports(deployer):
             ports.append((protocol, base_port))
             base_port += 1
@@ -115,9 +111,8 @@ def build_challenge_requests(
                 continue
 
             protocol, port_value = deploy_ports[0]
-            connection_info = build_connection_string(
+            connection_info = protocol.connection_string(
                 host=CHALLENGE_HOST,
-                protocol=protocol,
                 port=port_value,
                 path=challenge.host.path,
             )
@@ -219,7 +214,7 @@ def send_flag_requests(
             continue
 
         for flag_api in res.json()["data"]:
-            context.session.delete(f"/flags/{flag_api["id"]}")
+            context.session.delete(f"/flags/{flag_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post(
@@ -291,7 +286,7 @@ def send_attachment_requests(
             continue
 
         for files_api in res.json()["data"]:
-            context.session.delete(f"/files/{files_api["id"]}")
+            context.session.delete(f"/files/{files_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post_data(
@@ -354,7 +349,7 @@ def send_hint_requests(
             continue
 
         for flag_api in res.json()["data"]:
-            context.session.delete(f"/hints/{flag_api["id"]}")
+            context.session.delete(f"/hints/{flag_api['id']}")
 
     for i, req in enumerate(reqs):
         res = context.session.post(

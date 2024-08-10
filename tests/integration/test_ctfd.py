@@ -1,7 +1,6 @@
 import json
 import os.path
 import tempfile
-import time
 import typing
 
 import docker
