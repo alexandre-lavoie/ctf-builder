@@ -26,13 +26,6 @@ class Context:
     api: CTFdAPI
 
 
-def make_teams(file: str) -> TeamFile:
-    with open(file, "r") as h:
-        data = json.load(h)
-
-    return TeamFile(**data)
-
-
 def deploy_user(user: CTFdUser, context: Context) -> typing.Sequence[LibError]:
     data, _ = context.api.get_users_by_query(user.name or "")
 
@@ -177,7 +170,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
-    team_file = make_teams(args.file)
+    with open(args.file, "r") as h:
+        config = json.load(h)
+
+    team_file = TeamFile(**config)
 
     context = Context(
         CTFdAPI(

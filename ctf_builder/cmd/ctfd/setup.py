@@ -29,21 +29,17 @@ class Context:
     file: str
 
 
-def make_setup(file: str, name: str, email: str, password: str) -> CTFdSetup:
-    with open(file, "r") as h:
+def setup(context: Context) -> typing.Sequence[LibError]:
+    with open(context.file, "r") as h:
         config = json.load(h)
 
-    config["name"] = name
-    config["email"] = email
-    config["password"] = password
+    ctfd_setup = CTFdSetup(**config)
 
-    return CTFdSetup(**config)
+    ctfd_setup.name = context.name
+    ctfd_setup.email = context.email
+    ctfd_setup.password = context.password
 
-
-def setup(context: Context) -> typing.Sequence[LibError]:
-    data = make_setup(context.file, context.name, context.email, context.password)
-
-    return CTFdAPI.setup(context.url, data, root=os.path.dirname(context.file))
+    return CTFdAPI.setup(context.url, ctfd_setup, root=os.path.dirname(context.file))
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
