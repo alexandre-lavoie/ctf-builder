@@ -9,6 +9,7 @@ from ...ctfd.api import CTFdAPI
 from ...ctfd.models import CTFdAccessToken, CTFdTeam, CTFdUser
 from ...ctfd.session import CTFdSession
 from ...error import DeployError, LibError, get_exit_status, print_errors
+from ...models.team import TeamFile
 from ..common import CliContext
 
 
@@ -25,39 +26,23 @@ class Context:
     api: CTFdAPI
 
 
-@dataclasses.dataclass
-class TeamFile:
-    team: CTFdTeam
-    users: typing.List[CTFdUser]
-
-
-def make_teams(file: str) -> typing.List[TeamFile]:
+def make_teams(file: str) -> TeamFile:
     with open(file, "r") as h:
         data = json.load(h)
 
-    teams = []
-    for team in data["teams"]:
-        team["id"] = -1
-        ctfd_team = CTFdTeam(**team)
-
-        users = []
-        for user in team["users"]:
-            user["id"] = -1
-            ctfd_user = CTFdUser(**user)
-
-            users.append(ctfd_user)
-
-        teams.append(TeamFile(team=ctfd_team, users=users))
-
-    return teams
+    return TeamFile(**data)
 
 
 def deploy_user(user: CTFdUser, context: Context) -> typing.Sequence[LibError]:
-    data, _ = context.api.get_users_by_query(user.email or "")
+    data, _ = context.api.get_users_by_query(user.name or "")
 
     res_errors: typing.Sequence[LibError]
-    if data:
-        user.id = data[0].id
+    if data and any(ctfd_user.name == user.name for ctfd_user in data):
+        for ctfd_user in data:
+            if ctfd_user.name == user.name:
+                break
+
+        user.id = ctfd_user.id
 
         res, res_errors = context.api.update_user(user)
     else:
@@ -95,33 +80,39 @@ def add_user_to_team(
     )
 
 
-def deploy_team(team_file: TeamFile, context: Context) -> typing.Sequence[LibError]:
-    data, _ = context.api.get_teams_by_query(team_file.team.email or "")
+def deploy_team(
+    team: CTFdTeam, users: typing.Sequence[CTFdUser], context: Context
+) -> typing.Sequence[LibError]:
+    data, _ = context.api.get_teams_by_query(team.name or "")
 
     res_errors: typing.Sequence[LibError]
-    if data:
-        team_file.team.id = data[0].id
+    if data and any(ctfd_team.name == team.name for ctfd_team in data):
+        for ctfd_team in data:
+            if ctfd_team.name == team.name:
+                break
 
-        res, res_errors = context.api.update_team(team_file.team)
+        team.id = ctfd_team.id
+
+        res, res_errors = context.api.update_team(team)
     else:
-        if not team_file.team.password:
-            team_file.team.password = str(uuid.uuid4())
+        if not team.password:
+            team.password = str(uuid.uuid4())
 
-        res, res_errors = context.api.create_team(team_file.team)
+        res, res_errors = context.api.create_team(team)
 
     if res is None:
         return res_errors
 
-    team_file.team.id = res.id
+    team.id = res.id
 
     errors: typing.List[LibError] = []
-    for user in team_file.users:
+    for user in users:
         user_errors = deploy_user(user, context)
         if user_errors:
             errors += user_errors
             continue
 
-        errors += add_user_to_team(team_file.team.id, user.id, context)
+        errors += add_user_to_team(team.id, user.id, context)
 
     return errors
 
@@ -131,17 +122,29 @@ def merge_teams_json(
 ) -> typing.Dict[str, typing.Any]:
     out = {**new}
 
+    old_teams = {team["email"]: team for team in old["teams"]}
+
     teams = []
-    for old_team, new_team in zip(old["teams"], new["teams"]):
+    for new_team in new["teams"]:
         team = {**new_team}
 
-        team["password"] = old_team["password"]
+        old_team = old_teams.get(new_team["email"])
+        if old_team is None:
+            teams.append(team)
+            continue
+
+        if password := old_team.get("password"):
+            team["password"] = password
+
+        old_users = {user["email"]: user for user in old_team["users"]}
 
         users = []
-        for old_user, new_user in zip(old_team["users"], new_team["users"]):
+        for new_user in new_team["users"]:
             user = {**new_user}
 
-            user["password"] = old_user["password"]
+            old_user = old_users.get(new_user["email"])
+            if old_user and (password := old_user.get("password")):
+                user["password"] = password
 
             users.append(user)
 
@@ -174,7 +177,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
-    teams = make_teams(args.file)
+    team_file = make_teams(args.file)
 
     context = Context(
         CTFdAPI(
@@ -186,29 +189,32 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     all_errors: typing.List[LibError] = []
 
-    out_teams: typing.List[TeamFile] = []
-    for team_file in teams:
-        errors = deploy_team(team_file, context)
+    teams: typing.List[typing.Dict[str, typing.Any]] = []
+    for team in team_file.teams:
+        ctfd_team = CTFdTeam(id=-1, name=team.name, email=team.email)
+
+        ctfd_users = [
+            CTFdUser(id=-1, name=user.name, email=user.email) for user in team.users
+        ]
+
+        errors = deploy_team(team=ctfd_team, users=ctfd_users, context=context)
         all_errors += errors
 
         print_errors(
-            prefix=[team_file.team.name or "team"],
+            prefix=[team.name or "team"],
             errors=errors,
             console=cli_context.console,
         )
 
         if not errors:
-            out_teams.append(team_file)
+            teams.append(
+                {
+                    **ctfd_team.model_dump(mode="json"),
+                    "users": [user.model_dump(mode="json") for user in ctfd_users],
+                }
+            )
 
-    out_json = {
-        "teams": [
-            {
-                **team_file.team.model_dump(mode="json"),
-                "users": [user.model_dump(mode="json") for user in team_file.users],
-            }
-            for team_file in out_teams
-        ]
-    }
+    out_json = {"teams": teams}
 
     if os.path.isfile(args.output):
         with open(args.output) as h:

@@ -4,6 +4,7 @@ import json
 import os.path
 
 from ..models.challenge import Track
+from ..models.team import TeamFile
 from .common import CliContext
 
 
@@ -27,9 +28,10 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     os.makedirs(args.output, exist_ok=True)
 
-    challenge_json = os.path.join(args.output, "challenge.json")
-
-    with open(challenge_json, "w") as h:
+    with open(os.path.join(args.output, "challenge.json"), "w") as h:
         json.dump(Track.model_json_schema(), h, indent=2)
+
+    with open(os.path.join(args.output, "teams.json"), "w") as h:
+        json.dump(TeamFile.model_json_schema(), h, indent=2)
 
     return True
