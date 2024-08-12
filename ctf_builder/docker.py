@@ -1,2 +1,2 @@
 def to_docker_tag(text: str) -> str:
-    return text.replace(" ", "_").lower()
+    return text.replace(" ", "-").lower()

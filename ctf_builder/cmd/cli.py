@@ -21,6 +21,8 @@ from .docker.stop import cli as docker_stop_cli
 from .docker.stop import cli_args as docker_stop_args
 from .documentation import cli as documentation_cli
 from .documentation import cli_args as documentation_args
+from .k8s.build import cli as k8s_build_cli
+from .k8s.build import cli_args as k8s_build_args
 from .schema import cli as schema_cli
 from .schema import cli_args as schema_args
 from .test import cli as test_cli
@@ -96,6 +98,16 @@ CLI = Menu(
                     help="Deploy challenge images",
                     args=docker_deploy_args,
                     cli=docker_deploy_cli,
+                ),
+            },
+        ),
+        "k8s": Menu(
+            help="Kubernetes integration",
+            options={
+                "build": Command(
+                    help="Build infrastructure files",
+                    args=k8s_build_args,
+                    cli=k8s_build_cli,
                 ),
             },
         ),
