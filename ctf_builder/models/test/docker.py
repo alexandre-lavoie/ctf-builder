@@ -178,7 +178,7 @@ class TestDocker(BaseTest):
                     )
                     continue
 
-                challenge_host = f"host_{challenge.host.index}"
+                challenge_host = f"host-{challenge.host.index}"
 
                 deployer = context.deployers[challenge.host.index]
 

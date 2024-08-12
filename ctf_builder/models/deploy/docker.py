@@ -48,7 +48,7 @@ class DeployDocker(BaseDeploy):
 
     def get_container_name(self, context: DockerDeployContext) -> str:
         if context.network:
-            return to_docker_tag(f"{context.network}_{context.name}")
+            return to_docker_tag(f"{context.network}-{context.name}")
 
         return self.get_tag_name(context)
 

@@ -36,7 +36,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         if (
             network := create_network(
                 context.docker_client,
-                to_docker_tag(f"ctf-builder_test_{track.tag or track.name}"),
+                to_docker_tag(f"ctf-builder_test-{track.tag or track.name}"),
             )
         ) is None:
             return [DeployError(context="Network", msg="failed to start")]
@@ -50,7 +50,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         if network:
             for i, deployer in enumerate(track.deploy):
                 deployer_context = DockerDeployContext(
-                    name=f"host_{i}",
+                    name=f"host-{i}",
                     root=context.challenge_path,
                     docker_client=context.docker_client,
                     network=network.name,
