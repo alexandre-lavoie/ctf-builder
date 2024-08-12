@@ -55,6 +55,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                     docker_client=context.docker_client,
                     network=network.name,
                     host=None,
+                    tag=False,
                 )
 
                 deployer_errors = deployer.docker_start(

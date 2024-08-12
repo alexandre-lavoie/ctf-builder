@@ -62,7 +62,7 @@ class BuildDocker(BaseBuild):
                 build_args[key] = value
 
         try:
-            image, logs = context.docker_client.images.build(
+            image, _ = context.docker_client.images.build(
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,

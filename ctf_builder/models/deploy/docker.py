@@ -43,14 +43,14 @@ class DeployDocker(BaseDeploy):
         default=None, description=("Healtcheck for Dockerfile")
     )
 
-    def get_dns_name(self, context: DockerDeployContext) -> str:
+    def get_tag_name(self, context: DockerDeployContext) -> str:
         return to_docker_tag(context.name)
 
     def get_container_name(self, context: DockerDeployContext) -> str:
         if context.network:
             return to_docker_tag(f"{context.network}_{context.name}")
 
-        return self.get_dns_name(context)
+        return self.get_tag_name(context)
 
     def get_ports(self) -> typing.Sequence[Port]:
         return self.ports
@@ -92,7 +92,7 @@ class DeployDocker(BaseDeploy):
         return os.path.abspath(dockerfile), []
 
     def __build_image(
-        self, context: DockerDeployContext, dockerfile: str
+        self, context: DockerDeployContext, dockerfile: str, tag: bool
     ) -> typing.Tuple[
         typing.Optional[docker.models.images.Image], typing.Sequence[LibError]
     ]:
@@ -117,6 +117,7 @@ class DeployDocker(BaseDeploy):
 
         try:
             image, _ = context.docker_client.images.build(
+                tag=self.get_tag_name(context) if tag else None,
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,
@@ -135,7 +136,9 @@ class DeployDocker(BaseDeploy):
         if context.docker_client is None or not dockerfile:
             return docker_errors
 
-        image, image_errors = self.__build_image(context, dockerfile)
+        image, image_errors = self.__build_image(
+            context=context, dockerfile=dockerfile, tag=context.tag
+        )
         if not image:
             return image_errors
 
@@ -165,7 +168,7 @@ class DeployDocker(BaseDeploy):
 
         aliases = []
 
-        dns_name = self.get_dns_name(context)
+        dns_name = self.get_tag_name(context)
         aliases.append(dns_name)
 
         container_name = self.get_container_name(context)
@@ -252,7 +255,9 @@ class DeployDocker(BaseDeploy):
         if not dockerfile:
             return docker_errors
 
-        image, image_errors = self.__build_image(context, dockerfile)
+        image, image_errors = self.__build_image(
+            context=context, dockerfile=dockerfile, tag=context.tag
+        )
         if not image:
             return image_errors
 

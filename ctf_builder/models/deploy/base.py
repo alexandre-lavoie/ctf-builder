@@ -26,6 +26,7 @@ class DockerDeployContext:
     port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )
+    tag: bool = dataclasses.field(default=True)
 
 
 class BaseDeploy(abc.ABC, pydantic.BaseModel):
