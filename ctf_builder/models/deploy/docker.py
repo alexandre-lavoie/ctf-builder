@@ -20,9 +20,6 @@ class DeployDocker(BaseDeploy):
     """
 
     type: typing.Literal["docker"]
-    name: typing.Optional[str] = pydantic.Field(
-        default=None, description="Hostname on network"
-    )
     path: typing.Optional[FilePath] = pydantic.Field(
         default=None, description="Path to Dockerfile"
     )
@@ -174,9 +171,6 @@ class DeployDocker(BaseDeploy):
         container_name = self.get_container_name(context)
         if container_name != dns_name:
             aliases.append(container_name)
-
-        if self.name:
-            aliases.append(to_docker_tag(self.name))
 
         try:
             context.docker_client.containers.run(

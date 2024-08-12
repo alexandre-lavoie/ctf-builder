@@ -50,7 +50,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         if network:
             for i, deployer in enumerate(track.deploy):
                 deployer_context = DockerDeployContext(
-                    name=f"host-{i}",
+                    name=f"{track.tag or track.name}-{i}",
                     root=context.challenge_path,
                     docker_client=context.docker_client,
                     network=network.name,
@@ -98,6 +98,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         for test in track.test:
             errors += test.build(
                 TestContext(
+                    name=f"{track.tag or track.name}",
                     root=context.challenge_path,
                     network=network.name if network else None,
                     challenges=track.challenges,

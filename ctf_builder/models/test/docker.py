@@ -134,7 +134,7 @@ class TestDocker(BaseTest):
                 environment[key] = value
 
         try:
-            image, logs = context.docker_client.images.build(
+            image, _ = context.docker_client.images.build(
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,
@@ -178,7 +178,7 @@ class TestDocker(BaseTest):
                     )
                     continue
 
-                challenge_host = f"host-{challenge.host.index}"
+                challenge_host = f"{context.name}-{challenge.host.index}"
 
                 deployer = context.deployers[challenge.host.index]
 

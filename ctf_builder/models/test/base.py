@@ -16,6 +16,7 @@ if typing.TYPE_CHECKING:
 @dataclasses.dataclass(frozen=True)
 class TestContext:
     root: str
+    name: str
     challenges: typing.Sequence["Challenge"]
     deployers: typing.Sequence[Deploy]
     network: typing.Optional[str]
