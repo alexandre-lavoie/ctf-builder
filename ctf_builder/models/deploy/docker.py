@@ -155,6 +155,9 @@ class DeployDocker(BaseDeploy):
         port_bindings = {}
         if context.host:
             for port in self.ports:
+                if not port.public:
+                    continue
+
                 port_bindings[port.value] = (context.host, next(context.port_generator))
 
         if errors:

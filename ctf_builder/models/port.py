@@ -17,7 +17,10 @@ def uri_connection_string(protocol: str, context: ConnectionContext) -> str:
 
 
 class BasePort(abc.ABC, pydantic.BaseModel):
-    value: int
+    value: int = pydantic.Field(description="Port value")
+    public: bool = pydantic.Field(
+        default=False, description="Is this port exposed to the internet?"
+    )
 
     @abc.abstractmethod
     def connection_string(self, context: ConnectionContext) -> str:

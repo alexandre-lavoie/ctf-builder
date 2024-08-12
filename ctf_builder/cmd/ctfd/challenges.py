@@ -59,6 +59,9 @@ def build_challenges(
     for deployer in track.deploy:
         ports: typing.List[typing.Tuple[Port, int]] = []
         for port in deployer.get_ports():
+            if not port.public:
+                continue
+
             ports.append((port, base_port))
             base_port += 1
         deploy_ports_list.append(ports)
