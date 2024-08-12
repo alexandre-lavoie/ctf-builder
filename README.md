@@ -84,14 +84,15 @@ FLAG - the value of the flag to test.
 FLAG_TYPE - the type of flag to test (static, regex).
 ```
 
-## ☁️ Deploy
+## 🐋 Docker
 
 ```
-ctf start
-ctf stop
+ctf docker start
+ctf docker stop
+ctf docker deploy
 ```
 
-Deploys challenges to their containerized environment. This is useful for network-based challenges.
+Deploys challenges to [Docker](https://docs.docker.com/get-docker/). This is useful for containerizing challenges.
 
 ### 🔌 Ports
 
@@ -103,9 +104,9 @@ docker container ls
 
 ### 🌐 Multi-deployment
 
-Challenges can be deployed on multiple virtual hosts. This can be used to provide every team their own infrastructure. 
+Challenges can be deployed on multiple local virtual hosts. This can be used to provide every team their own infrastructure. 
 
-#### Setup Hosts
+#### 🖥️ Setup Hosts
 
 Determine the IP range and interface for the network.
 
@@ -121,7 +122,7 @@ sudo ip addr add 192.168.0.3/24 dev eth0
 ...
 ```
 
-#### Deploy
+#### 🚀 Deploy
 
 The infrastructures can be deployed as follows.
 
@@ -147,7 +148,7 @@ ctf ctfd dev
 
 A simple development environment. Automatically spins up challenges without any hassle.
 
-#### Credentials
+#### 🔑 Credentials
 
 The credentials for the default/admin user is the following.
 
@@ -156,7 +157,7 @@ Name: admin
 Password: admin
 ```
 
-#### Interactive Console
+#### 🖥️ Interactive Console
 
 By default, an interactive console is open when the environment spun up. This is an [argparse](https://docs.python.org/3/library/argparse.html), therefore acts like a CLI argument parser. Help for available commands can be accessed through `-h`. 
 

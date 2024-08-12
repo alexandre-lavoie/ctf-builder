@@ -2,6 +2,7 @@ import os.path
 import typing
 
 import docker.errors
+import docker.models.images
 import pydantic
 
 from ...docker import to_docker_tag
@@ -10,7 +11,7 @@ from ..arguments import ArgumentContext, Arguments
 from ..healthcheck import Healthcheck
 from ..path import FilePath, PathContext
 from ..port import Port
-from .base import BaseDeploy, DeployContext
+from .base import BaseDeploy, DockerDeployContext
 
 
 class DeployDocker(BaseDeploy):
@@ -42,10 +43,10 @@ class DeployDocker(BaseDeploy):
         default=None, description=("Healtcheck for Dockerfile")
     )
 
-    def get_dns_name(self, context: DeployContext) -> str:
+    def get_dns_name(self, context: DockerDeployContext) -> str:
         return to_docker_tag(context.name)
 
-    def get_container_name(self, context: DeployContext) -> str:
+    def get_container_name(self, context: DockerDeployContext) -> str:
         if context.network:
             return to_docker_tag(f"{context.network}_{context.name}")
 
@@ -54,10 +55,10 @@ class DeployDocker(BaseDeploy):
     def get_ports(self) -> typing.Sequence[Port]:
         return self.ports
 
-    def has_healthcheck(self, context: DeployContext) -> bool:
+    def has_healthcheck(self) -> bool:
         return self.healthcheck is not None
 
-    def is_healthy(self, context: DeployContext) -> bool:
+    def docker_healthcheck(self, context: DockerDeployContext) -> bool:
         if context.docker_client is None:
             return False
 
@@ -73,11 +74,11 @@ class DeployDocker(BaseDeploy):
 
         return status == "running" and health == "healthy"
 
-    def start(
-        self, context: DeployContext, skip_reuse: bool = True
-    ) -> typing.Sequence[LibError]:
+    def __dockerfile(
+        self, context: DockerDeployContext
+    ) -> typing.Tuple[typing.Optional[str], typing.Sequence[LibError]]:
         if context.docker_client is None:
-            return [BuildError(context="Docker", msg="client not initialized")]
+            return None, [BuildError(context="Docker", msg="client not initialized")]
 
         dockerfile: typing.Optional[str]
         if self.path is None:
@@ -86,11 +87,20 @@ class DeployDocker(BaseDeploy):
             dockerfile = self.path.resolve(PathContext(root=context.root))
 
         if dockerfile is None or not os.path.isfile(dockerfile):
-            return [BuildError(context="Dockerfile", msg="is not a file")]
+            return None, [BuildError(context="Dockerfile", msg="is not a file")]
 
-        dockerfile = os.path.abspath(dockerfile)
+        return os.path.abspath(dockerfile), []
+
+    def __build_image(
+        self, context: DockerDeployContext, dockerfile: str
+    ) -> typing.Tuple[
+        typing.Optional[docker.models.images.Image], typing.Sequence[LibError]
+    ]:
+        if context.docker_client is None:
+            return None, [BuildError(context="Docker", msg="client not initialized")]
 
         errors: typing.List[LibError] = []
+
         build_args = {}
         for args in self.args:
             if (arg_map := args.build(ArgumentContext(root=context.root))) is None:
@@ -102,6 +112,35 @@ class DeployDocker(BaseDeploy):
             for key, value in arg_map.items():
                 build_args[key] = value
 
+        if errors:
+            return None, errors
+
+        try:
+            image, _ = context.docker_client.images.build(
+                path=os.path.dirname(dockerfile),
+                dockerfile=dockerfile,
+                buildargs=build_args,
+            )
+        except docker.errors.BuildError as e:
+            return None, [
+                BuildError(context="Dockerfile", msg="failed to build", error=e)
+            ]
+
+        return image, []
+
+    def docker_start(
+        self, context: DockerDeployContext, skip_reuse: bool = True
+    ) -> typing.Sequence[LibError]:
+        dockerfile, docker_errors = self.__dockerfile(context)
+        if context.docker_client is None or not dockerfile:
+            return docker_errors
+
+        image, image_errors = self.__build_image(context, dockerfile)
+        if not image:
+            return image_errors
+
+        errors: typing.List[LibError] = []
+
         environment = {}
         for env in self.env:
             if (arg_map := env.build(ArgumentContext(root=context.root))) is None:
@@ -112,17 +151,6 @@ class DeployDocker(BaseDeploy):
 
             for key, value in arg_map.items():
                 environment[key] = value
-
-        try:
-            image, logs = context.docker_client.images.build(
-                path=os.path.dirname(dockerfile),
-                dockerfile=dockerfile,
-                buildargs=build_args,
-            )
-        except docker.errors.BuildError as e:
-            return errors + [
-                BuildError(context="Dockerfile", msg="failed to build", error=e)
-            ]
 
         port_bindings = {}
         if context.host:
@@ -194,8 +222,8 @@ class DeployDocker(BaseDeploy):
 
         return errors
 
-    def stop(
-        self, context: DeployContext, skip_not_found: bool = True
+    def docker_stop(
+        self, context: DockerDeployContext, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="client not initialized")]
@@ -213,5 +241,16 @@ class DeployDocker(BaseDeploy):
                 return [DeployError(context=context.name, msg="failed to stop")]
         except docker.errors.APIError as e:
             [DeployError(context=context.name, msg="failed to stop", error=e)]
+
+        return []
+
+    def docker_deploy(self, context: DockerDeployContext) -> typing.Sequence[LibError]:
+        dockerfile, docker_errors = self.__dockerfile(context)
+        if not dockerfile:
+            return docker_errors
+
+        image, image_errors = self.__build_image(context, dockerfile)
+        if not image:
+            return image_errors
 
         return []

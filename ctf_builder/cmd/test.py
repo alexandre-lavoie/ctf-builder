@@ -10,7 +10,7 @@ from ..docker import to_docker_tag
 from ..error import DeployError, LibError
 from ..models.challenge import Track
 from ..models.deploy import Deploy
-from ..models.deploy.base import DeployContext
+from ..models.deploy.base import DockerDeployContext
 from ..models.test.base import TestContext
 from .common import (
     CliContext,
@@ -44,12 +44,12 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         network = None
 
     errors: typing.List[LibError] = []
-    running_deployers: typing.List[typing.Tuple[Deploy, DeployContext]] = []
+    running_deployers: typing.List[typing.Tuple[Deploy, DockerDeployContext]] = []
     try:
-        waiting_deployers: typing.List[typing.Tuple[Deploy, DeployContext]] = []
+        waiting_deployers: typing.List[typing.Tuple[Deploy, DockerDeployContext]] = []
         if network:
             for i, deployer in enumerate(track.deploy):
-                deployer_context = DeployContext(
+                deployer_context = DockerDeployContext(
                     name=f"host_{i}",
                     root=context.challenge_path,
                     docker_client=context.docker_client,
@@ -57,7 +57,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                     host=None,
                 )
 
-                deployer_errors = deployer.start(
+                deployer_errors = deployer.docker_start(
                     context=deployer_context, skip_reuse=False
                 )
                 errors += deployer_errors
@@ -65,19 +65,19 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
                 if not deployer_errors:
                     running_deployers.append((deployer, deployer_context))
 
-                    if deployer.has_healthcheck(context=deployer_context):
+                    if deployer.has_healthcheck():
                         waiting_deployers.append((deployer, deployer_context))
 
         if errors:
             return errors
 
         for i in range(DEPLOY_ATTEMPTS):
-            waiting_deployers_next: typing.List[typing.Tuple[Deploy, DeployContext]] = (
-                []
-            )
+            waiting_deployers_next: typing.List[
+                typing.Tuple[Deploy, DockerDeployContext]
+            ] = []
 
             for deployer, deployer_context in waiting_deployers:
-                if deployer.is_healthy(context=deployer_context):
+                if deployer.docker_healthcheck(context=deployer_context):
                     continue
 
                 waiting_deployers_next.append((deployer, deployer_context))
@@ -107,7 +107,9 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     finally:
         for deployer, deployer_context in running_deployers:
             try:
-                errors += deployer.stop(context=deployer_context, skip_not_found=False)
+                errors += deployer.docker_stop(
+                    context=deployer_context, skip_not_found=False
+                )
             except:
                 pass
 

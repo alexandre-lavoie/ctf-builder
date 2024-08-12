@@ -14,7 +14,7 @@ package_name = "ctf_builder"
 
 setuptools.setup(
     name=package_name,
-    version="0.0.10",
+    version="0.0.11",
     license="MIT",
     author="Alexandre Lavoie",
     author_email="alexandre.lavoie00@gmail.com",

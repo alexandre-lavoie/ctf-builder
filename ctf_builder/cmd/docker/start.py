@@ -5,16 +5,16 @@ import typing
 import docker
 import docker.models.networks
 
-from ..config import (
+from ...config import (
     CHALLENGE_BASE_PORT,
     CHALLENGE_MAX_PORTS,
     DEPLOY_NETWORK,
     NULL_VALUES,
 )
-from ..error import DeployError, LibError, SkipError, print_errors
-from ..models.challenge import Track
-from ..models.deploy.base import DeployContext
-from .common import (
+from ...error import DeployError, LibError, SkipError, print_errors
+from ...models.challenge import Track
+from ...models.deploy.base import DockerDeployContext
+from ..common import (
     CliContext,
     WrapContext,
     cli_challenge_wrapper,
@@ -54,8 +54,8 @@ def start(track: Track, context: Context) -> typing.Sequence[LibError]:
 
     errors: typing.List[LibError] = []
     for i, deployer in enumerate(track.deploy):
-        errors += deployer.start(
-            DeployContext(
+        errors += deployer.docker_start(
+            DockerDeployContext(
                 name=f"{track.tag or track.name}_{i}",
                 root=context.challenge_path,
                 docker_client=context.docker_client,
