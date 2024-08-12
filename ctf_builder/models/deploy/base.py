@@ -15,7 +15,7 @@ def default_port_generator() -> typing.Generator[typing.Optional[int], None, Non
 
 
 @dataclasses.dataclass
-class DeployContext:
+class DockerDeployContext:
     name: str
     root: str
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
@@ -38,21 +38,25 @@ class BaseDeploy(abc.ABC, pydantic.BaseModel):
         pass
 
     @abc.abstractmethod
-    def has_healthcheck(cls, context: DeployContext) -> bool:
+    def has_healthcheck(cls) -> bool:
         pass
 
     @abc.abstractmethod
-    def is_healthy(cls, context: DeployContext) -> bool:
+    def docker_healthcheck(cls, context: DockerDeployContext) -> bool:
         pass
 
     @abc.abstractmethod
-    def start(
-        self, context: DeployContext, skip_reuse: bool = True
+    def docker_start(
+        self, context: DockerDeployContext, skip_reuse: bool = True
     ) -> typing.Sequence[LibError]:
         pass
 
     @abc.abstractmethod
-    def stop(
-        self, context: DeployContext, skip_not_found: bool = True
+    def docker_stop(
+        self, context: DockerDeployContext, skip_not_found: bool = True
     ) -> typing.Sequence[LibError]:
+        pass
+
+    @abc.abstractmethod
+    def docker_deploy(self, context: DockerDeployContext) -> typing.Sequence[LibError]:
         pass
