@@ -76,7 +76,7 @@ class FileAttachment(BaseAttachment):
     type: typing.Literal["file"]
     path: FilePath = pydantic.Field(description="Path to attachment file")
     name: typing.Optional[str] = pydantic.Field(
-        description="Name of the attachment, if not file.ext"
+        default=None, description="Name of the attachment, if not file.ext"
     )
 
     def build(self, context: AttachmentContext) -> typing.Optional[AttachmentHandle]:
