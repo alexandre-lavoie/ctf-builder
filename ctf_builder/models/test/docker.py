@@ -75,6 +75,7 @@ class TestDocker(BaseTest):
     Testing using Dockerfile.
     """
 
+    type: typing.Literal["docker"]
     challenges: typing.List[int] = pydantic.Field(
         default_factory=list,
         description="Challenges to run test on, all by default",
