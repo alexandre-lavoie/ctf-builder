@@ -3,7 +3,7 @@ import dataclasses
 import typing
 
 from ..error import LibError
-from ..schema import Track
+from ..models.challenge import Track
 from .common import CliContext, WrapContext, cli_challenge_wrapper, get_challenges
 
 

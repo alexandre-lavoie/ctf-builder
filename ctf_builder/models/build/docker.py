@@ -1,55 +1,48 @@
-import abc
-import dataclasses
-import io
 import os.path
-import tarfile
+import io
 import typing
+import tarfile
 
 import docker
 import docker.errors
+import docker.models.containers
+import pydantic
 
-from ..error import BuildError, LibError
-from ..schema import Builder, BuilderDocker
+from .base import BuildContext, BaseBuild
+from ...error import LibError, BuildError
 
-from .args import BuildArgs
-from .file_map import BuildFileMap
-from .utils import subclass_get
-
-T = typing.TypeVar("T", bound=Builder)
+from ..arguments import Arguments, ArgumentContext
+from ..file import FileMap
+from ..path import FilePath, PathContext
 
 
-@dataclasses.dataclass
-class BuildContext:
-    path: str
-    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
-        default=None
+class BuildDocker(BaseBuild):
+    """
+    Builder using Dockerfiles.
+    """
+
+    type: typing.Literal["docker"]
+    path: typing.Optional[FilePath] = pydantic.Field(
+        default=None, description="Path to Dockerfile"
+    )
+    args: typing.List[Arguments] = pydantic.Field(
+        default_factory=list,
+        description="Build arguments for Dockerfile",
+        discriminator="type",
+    )
+    files: typing.List[FileMap] = pydantic.Field(
+        default_factory=list, description="Files to map after build"
     )
 
-
-class BuildBuilder(typing.Generic[T], abc.ABC):
-    @classmethod
-    def get(cls, obj: T) -> typing.Type["BuildBuilder[typing.Any]"]:
-        return subclass_get(cls, obj)
-
-    @classmethod
-    @abc.abstractmethod
-    def build(cls, context: BuildContext, builder: T) -> typing.Sequence[LibError]:
-        pass
-
-
-class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
-    @classmethod
-    def build(
-        cls, context: BuildContext, builder: BuilderDocker
-    ) -> typing.Sequence[LibError]:
+    def build(self, context: BuildContext) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="no client initialized")]
 
         dockerfile: typing.Optional[str]
-        if builder.path is None:
-            dockerfile = os.path.join(context.path, "Dockerfile")
+        if self.path is None:
+            dockerfile = os.path.join(context.root, "Dockerfile")
         else:
-            dockerfile = builder.path.resolve(context.path)
+            dockerfile = self.path.resolve(PathContext(root=context.root))
 
         if dockerfile is None or not os.path.isfile(dockerfile):
             return [BuildError(context="Dockerfile", msg="is not a file")]
@@ -58,8 +51,8 @@ class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
 
         errors = []
         build_args = {}
-        for args in builder.args:
-            if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
+        for args in self.args:
+            if (arg_map := args.build(ArgumentContext(root=context.root))) is None:
                 errors.append(
                     BuildError(context="Dockerfile", msg="invalid build args")
                 )
@@ -80,16 +73,20 @@ class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
             ]
 
         try:
-            container = context.docker_client.containers.create(image=image)
+            container: docker.models.containers.Container = (
+                context.docker_client.containers.create(image=image)
+            )
         except docker.errors.APIError as e:
             return errors + [
                 BuildError(context="Dockerfile", msg="failed to create", error=e)
             ]
 
         try:
-            for file_map in builder.files:
-                source, destination = BuildFileMap.build(file_map)
-                destination = os.path.join(os.path.abspath(context.path), destination)
+            for file_map in self.files:
+                handle = file_map.build()
+                destination = os.path.join(
+                    os.path.abspath(context.root), handle.destination
+                )
 
                 if os.path.isdir(destination):
                     errors.append(BuildError(context=destination, msg="is a directory"))
@@ -98,10 +95,12 @@ class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
                 os.makedirs(os.path.dirname(destination), exist_ok=True)
 
                 try:
-                    res, _ = container.get_archive(source)
+                    res, _ = container.get_archive(handle.source)
                 except docker.errors.NotFound:
                     errors.append(
-                        BuildError(context=source, msg="was not found in container")
+                        BuildError(
+                            context=handle.source, msg="was not found in container"
+                        )
                     )
                     continue
 
@@ -115,7 +114,8 @@ class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
                     if len(members) != 1:
                         errors.append(
                             BuildError(
-                                context=source, msg="is a directory in the container"
+                                context=handle.source,
+                                msg="is a directory in the container",
                             )
                         )
                         continue
@@ -123,7 +123,9 @@ class BuildBuilderDocker(BuildBuilder[BuilderDocker]):
                     extract_file = th.extractfile(members[0])
                     if extract_file is None:
                         errors.append(
-                            BuildError(context=source, msg="file cannot be extracted")
+                            BuildError(
+                                context=handle.source, msg="file cannot be extracted"
+                            )
                         )
                         continue
 

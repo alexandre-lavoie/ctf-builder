@@ -1,4 +1,3 @@
-import abc
 import dataclasses
 import os.path
 import threading
@@ -6,40 +5,13 @@ import typing
 
 import docker
 import docker.errors
-import docker.models.containers
+import pydantic
 
-from ..error import TestError, BuildError, LibError
-from ..schema import Tester, TesterDocker, Challenge, Deployer
-
-from .args import BuildArgs
-from .deployer import BuildDeployer
-from .flag import BuildFlag
-from .utils import subclass_get
-
-
-T = typing.TypeVar("T", bound=Tester)
-
-
-@dataclasses.dataclass
-class TestContext:
-    path: str
-    challenges: typing.Sequence[Challenge]
-    deployers: typing.Sequence[Deployer]
-    network: typing.Optional[str]
-    docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
-        default=None
-    )
-
-
-class BuildTester(typing.Generic[T], abc.ABC):
-    @classmethod
-    def get(cls, obj: Tester) -> typing.Type["BuildTester[typing.Any]"]:
-        return subclass_get(cls, obj)
-
-    @classmethod
-    @abc.abstractmethod
-    def build(cls, context: TestContext, tester: T) -> typing.Sequence[LibError]:
-        pass
+from ...error import BuildError, LibError, TestError
+from ..arguments import ArgumentContext, Arguments
+from ..flag import FlagContext
+from ..path import FilePath, PathContext
+from .base import BaseTest, TestContext
 
 
 @dataclasses.dataclass(frozen=True)
@@ -98,19 +70,38 @@ def docker_test(context: DockerTestContext) -> None:
         context.errors.append(error)
 
 
-class BuildTesterDocker(BuildTester[TesterDocker]):
-    @classmethod
-    def build(
-        cls, context: TestContext, tester: TesterDocker
-    ) -> typing.Sequence[LibError]:
+class TestDocker(BaseTest):
+    """
+    Testing using Dockerfile.
+    """
+
+    challenges: typing.List[int] = pydantic.Field(
+        default_factory=list,
+        description="Challenges to run test on, all by default",
+    )
+    path: typing.Optional[FilePath] = pydantic.Field(
+        default=None, description="Path to Dockerfile"
+    )
+    args: typing.List[Arguments] = pydantic.Field(
+        default_factory=list,
+        description="Build arguments for Dockerfile",
+        discriminator="type",
+    )
+    env: typing.List[Arguments] = pydantic.Field(
+        default_factory=list,
+        description="Environments for Dockerfile",
+        discriminator="type",
+    )
+
+    def build(self, context: TestContext) -> typing.Sequence[LibError]:
         if context.docker_client is None:
             return [BuildError(context="Docker", msg="no client initialized")]
 
         dockerfile: typing.Optional[str]
-        if tester.path is None:
-            dockerfile = os.path.join(context.path, "Dockerfile")
+        if self.path is None:
+            dockerfile = os.path.join(context.root, "Dockerfile")
         else:
-            dockerfile = tester.path.resolve(context.path)
+            dockerfile = self.path.resolve(PathContext(root=context.root))
 
         if dockerfile is None or not os.path.isfile(dockerfile):
             return [BuildError(context="Dockerfile", msg="is not a file")]
@@ -120,8 +111,8 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
         errors: typing.List[LibError] = []
 
         build_args = {}
-        for args in tester.args:
-            if (arg_map := BuildArgs.get(args).build(context.path, args)) is None:
+        for args in self.args:
+            if (arg_map := args.build(ArgumentContext(root=context.root))) is None:
                 errors.append(
                     BuildError(context="Dockerfile", msg="invalid build args")
                 )
@@ -131,8 +122,8 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
                 build_args[key] = value
 
         environment = {}
-        for env in tester.env:
-            if (arg_map := BuildArgs.get(env).build(context.path, env)) is None:
+        for env in self.env:
+            if (arg_map := env.build(ArgumentContext(root=context.root))) is None:
                 errors.append(
                     BuildError(context="Dockerfile", msg="invalid environment")
                 )
@@ -152,10 +143,10 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
                 BuildError(context="Dockerfile", msg="failed to build", error=e)
             ]
 
-        if tester.challenges:
+        if self.challenges:
             challenges = {}
 
-            for challenge_id in tester.challenges:
+            for challenge_id in self.challenges:
                 if challenge_id < 0 or challenge_id >= len(context.challenges):
                     errors.append(
                         BuildError(
@@ -190,8 +181,7 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
 
                 deployer = context.deployers[challenge.host.index]
 
-                ports = BuildDeployer.get(deployer).ports(deployer)
-                if not ports:
+                if not (ports := deployer.get_ports()):
                     errors.append(
                         BuildError(
                             context=f"Challenge {challenge_id}", msg="no exposed ports"
@@ -199,13 +189,13 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
                     )
                     continue
 
-                _, challenge_port = ports[0]
+                challenge_port = ports[0]
             else:
                 challenge_host = None
                 challenge_port = None
 
             for flag_def in challenge.flags:
-                for flag in BuildFlag.build(context.path, flag_def):
+                for flag in flag_def.build(FlagContext(root=context.root)):
                     test_context = DockerTestContext(
                         docker_client=context.docker_client,
                         image=image.id,
@@ -213,7 +203,7 @@ class BuildTesterDocker(BuildTester[TesterDocker]):
                         environment=environment,
                         challenge_id=challenge_id,
                         challenge_host=challenge_host,
-                        challenge_port=challenge_port,
+                        challenge_port=challenge_port.value if challenge_port else None,
                         flag=flag,
                         flag_type="regex" if flag_def.regex else "static",
                         errors=[],

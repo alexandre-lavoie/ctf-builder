@@ -16,8 +16,7 @@ import rich.progress
 
 from ..config import CHALLENGE_MAX_PORTS
 from ..error import BuildError, LibError, SkipError, get_exit_status, print_errors
-from ..parse import parse_track
-from ..schema import PortProtocol, Track
+from ..models.challenge import Track
 
 
 MAX_TCP_PORT = 65_535
@@ -152,7 +151,7 @@ def cli_challenge(
         )
         return False
 
-    track, parse_errors = parse_track(raw_track)
+    track, parse_errors = Track.parse(raw_track)
     if track is None or parse_errors:
         errors += parse_errors
         return False

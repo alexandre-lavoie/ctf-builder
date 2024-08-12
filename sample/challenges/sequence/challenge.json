@@ -12,7 +12,7 @@
           "case_sensitive": true,
           "regex": false,
           "values": {
-            "$type": "env",
+            "type": "env",
             "path": "FLAG",
             "keys": [
               "FLAG1"
@@ -31,7 +31,7 @@
           "case_sensitive": true,
           "regex": false,
           "values": {
-            "$type": "env",
+            "type": "env",
             "path": "FLAG",
             "keys": [
               "FLAG2"

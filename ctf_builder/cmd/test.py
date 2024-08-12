@@ -5,12 +5,13 @@ import typing
 
 import docker
 
-from ..build.deployer import BuildDeployer, DeployContext
-from ..build.tester import BuildTester, TestContext
-from ..build.utils import to_docker_tag
 from ..config import DEPLOY_ATTEMPTS, DEPLOY_SLEEP
+from ..docker import to_docker_tag
 from ..error import DeployError, LibError
-from ..schema import Deployer, Track
+from ..models.challenge import Track
+from ..models.deploy import Deploy
+from ..models.deploy.base import DeployContext
+from ..models.test.base import TestContext
 from .common import (
     CliContext,
     WrapContext,
@@ -43,46 +44,40 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
         network = None
 
     errors: typing.List[LibError] = []
-    running_deployers: typing.List[typing.Tuple[Deployer, DeployContext]] = []
+    running_deployers: typing.List[typing.Tuple[Deploy, DeployContext]] = []
     try:
-        waiting_deployers: typing.List[typing.Tuple[Deployer, DeployContext]] = []
+        waiting_deployers: typing.List[typing.Tuple[Deploy, DeployContext]] = []
         if network:
             for i, deployer in enumerate(track.deploy):
                 deployer_context = DeployContext(
                     name=f"host_{i}",
-                    path=context.challenge_path,
+                    root=context.challenge_path,
                     docker_client=context.docker_client,
                     network=network.name,
                     host=None,
                 )
 
-                builder = BuildDeployer.get(deployer)
-
-                deployer_errors = builder.start(
-                    deployer=deployer, context=deployer_context, skip_reuse=False
+                deployer_errors = deployer.start(
+                    context=deployer_context, skip_reuse=False
                 )
                 errors += deployer_errors
 
                 if not deployer_errors:
                     running_deployers.append((deployer, deployer_context))
 
-                    if builder.has_healthcheck(
-                        deployer=deployer, context=deployer_context
-                    ):
+                    if deployer.has_healthcheck(context=deployer_context):
                         waiting_deployers.append((deployer, deployer_context))
 
         if errors:
             return errors
 
         for i in range(DEPLOY_ATTEMPTS):
-            waiting_deployers_next: typing.List[
-                typing.Tuple[Deployer, DeployContext]
-            ] = []
+            waiting_deployers_next: typing.List[typing.Tuple[Deploy, DeployContext]] = (
+                []
+            )
 
             for deployer, deployer_context in waiting_deployers:
-                if BuildDeployer.get(deployer).is_healthy(
-                    deployer=deployer, context=deployer_context
-                ):
+                if deployer.is_healthy(context=deployer_context):
                     continue
 
                 waiting_deployers_next.append((deployer, deployer_context))
@@ -99,11 +94,10 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
             )
             return errors
 
-        for tester in track.test:
-            errors += BuildTester.get(tester).build(
-                tester=tester,
-                context=TestContext(
-                    path=context.challenge_path,
+        for test in track.test:
+            errors += test.build(
+                TestContext(
+                    root=context.challenge_path,
                     network=network.name if network else None,
                     challenges=track.challenges,
                     deployers=track.deploy,
@@ -113,9 +107,7 @@ def test(track: Track, context: Context) -> typing.Sequence[LibError]:
     finally:
         for deployer, deployer_context in running_deployers:
             try:
-                errors += BuildDeployer.get(deployer).stop(
-                    deployer=deployer, context=deployer_context, skip_not_found=False
-                )
+                errors += deployer.stop(context=deployer_context, skip_not_found=False)
             except:
                 pass
 

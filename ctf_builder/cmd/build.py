@@ -4,9 +4,9 @@ import typing
 
 import docker
 
-from ..build.builder import BuildBuilder, BuildContext
 from ..error import LibError, SkipError
-from ..schema import Track
+from ..models.build.base import BuildContext
+from ..models.challenge import Track
 from .common import CliContext, WrapContext, cli_challenge_wrapper, get_challenges
 
 
@@ -26,10 +26,9 @@ def build(track: Track, context: Context) -> typing.Sequence[LibError]:
 
     errors: typing.List[LibError] = []
     for builder in track.build:
-        errors += BuildBuilder.get(builder).build(
-            builder=builder,
-            context=BuildContext(
-                path=context.challenge_path, docker_client=context.docker_client
+        errors += builder.build(
+            BuildContext(
+                root=context.challenge_path, docker_client=context.docker_client
             ),
         )
 

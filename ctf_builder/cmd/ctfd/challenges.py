@@ -2,14 +2,26 @@ import argparse
 import dataclasses
 import typing
 
-from ...build.attachment import BuildAttachment
-from ...build.deployer import BuildDeployer
-from ...build.flag import BuildFlag
-from ...build.translation import BuildTranslation
 from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
-from ...ctfd import CTFdAPI, ctfd_errors
+from ...ctfd.api import CTFdAPI
+from ...ctfd.models import (
+    CTFdAccessToken,
+    CTFdChallenge,
+    CTFdChallengeRequirements,
+    CTFdFileUpload,
+    CTFdFileUploadType,
+    CTFdFlag,
+    CTFdFlagData,
+    CTFdFlagType,
+    CTFdHint,
+)
+from ...ctfd.session import CTFdSession
 from ...error import BuildError, DeployError, LibError
-from ...schema import PortProtocol, Track, Translation
+from ...models.attachment import AttachmentContext
+from ...models.challenge import Track
+from ...models.flag import FlagContext
+from ...models.port import ConnectionContext, Port
+from ...models.text import Text, TextContext
 from ..common import (
     CliContext,
     WrapContext,
@@ -29,39 +41,13 @@ class Args:
 
 @dataclasses.dataclass(frozen=True)
 class Context(WrapContext):
-    session: CTFdAPI
+    api: CTFdAPI
     port: int
 
 
-@dataclasses.dataclass
-class ChallengeRequest:
-    category: str
-    description: str
-    name: str
-    value: int
-    state: str = dataclasses.field(default="visible")
-    type: str = dataclasses.field(default="standard")
-    connection_info: typing.Optional[str] = dataclasses.field(default=None)
-
-
-def build_translation(
-    root: str, translations: typing.Sequence[Translation]
-) -> typing.Optional[str]:
-    priority_texts = []
-    for translation in translations:
-        build = BuildTranslation.get(translation)
-
-        if (text := build.build(root, translation)) is None:
-            return None
-
-        priority_texts.append((build.priority(), text))
-
-    return "\n\n-----\n\n".join([v for _, v in sorted(priority_texts)])
-
-
-def build_challenge_requests(
+def build_challenges(
     track: Track, context: Context
-) -> typing.Tuple[typing.List[ChallengeRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[CTFdChallenge], typing.Sequence[LibError]]:
     output = []
     errors = []
 
@@ -69,11 +55,11 @@ def build_challenge_requests(
         context.port + get_challenge_index(context.challenge_path) * CHALLENGE_MAX_PORTS
     )
 
-    deploy_ports_list: typing.List[typing.List[typing.Tuple[PortProtocol, int]]] = []
+    deploy_ports_list: typing.List[typing.List[typing.Tuple[Port, int]]] = []
     for deployer in track.deploy:
-        ports: typing.List[typing.Tuple[PortProtocol, int]] = []
-        for protocol, _ in BuildDeployer.get(deployer).ports(deployer):
-            ports.append((protocol, base_port))
+        ports: typing.List[typing.Tuple[Port, int]] = []
+        for port in deployer.get_ports():
+            ports.append((port, base_port))
             base_port += 1
         deploy_ports_list.append(ports)
 
@@ -82,8 +68,11 @@ def build_challenge_requests(
         if challenge.name:
             name += f" - {challenge.name}"
 
-        description = build_translation(context.challenge_path, challenge.descriptions)
-        if description is None:
+        if (
+            description := Text.build_many(
+                challenge.descriptions, TextContext(root=context.challenge_path)
+            )
+        ) is None:
             errors.append(
                 BuildError(context=f"Challenge {i}", msg="has an invalid description")
             )
@@ -110,17 +99,20 @@ def build_challenge_requests(
                 )
                 continue
 
-            protocol, port_value = deploy_ports[0]
-            connection_info = protocol.connection_string(
-                host=CHALLENGE_HOST,
-                port=port_value,
-                path=challenge.host.path,
+            port, port_value = deploy_ports[0]
+            connection_info = port.connection_string(
+                ConnectionContext(
+                    host=CHALLENGE_HOST,
+                    port=port_value,
+                    path=challenge.host.path,
+                )
             )
         else:
             connection_info = None
 
         output.append(
-            ChallengeRequest(
+            CTFdChallenge(
+                id=-1,
                 name=name,
                 description=description,
                 category=challenge.category,
@@ -132,124 +124,100 @@ def build_challenge_requests(
     return output, errors
 
 
-def send_challenge_requests(
-    reqs: typing.List[ChallengeRequest], context: Context
+def send_challenges(
+    reqs: typing.List[CTFdChallenge], context: Context
 ) -> typing.Tuple[typing.List[int], typing.Sequence[LibError]]:
     output = []
     errors: typing.List[LibError] = []
 
-    for i, req in enumerate(reqs):
-        res = context.session.get("/challenges", data={"name": req.name})
+    for req in reqs:
+        res_many, res_errors = context.api.get_challenge_by_name(req.name or "")
 
         challenge_id = None
-        if res.status_code == 200:
-            data = res.json()["data"]
-
-            if len(data) == 1:
-                challenge_api = data[0]
-                challenge_id = challenge_api["id"]
+        if res_many:
+            challenge_id = res_many[0].id
 
         if challenge_id:
-            res = context.session.patch(
-                f"/challenges/{challenge_id}",
-                data=dataclasses.asdict(req),
-            )
-        else:
-            res = context.session.post(
-                "/challenges",
-                data=dataclasses.asdict(req),
-            )
+            req.id = challenge_id
 
-        if res_errors := ctfd_errors(res, context=f"Challenge {i}"):
+            res, res_errors = context.api.update_challenge(req)
+        else:
+            res, res_errors = context.api.create_challenge(req)
+
+        if res is None:
             errors += res_errors
             continue
 
-        output.append(res.json()["data"]["id"])
+        output.append(res.id)
 
     return output, errors
 
 
-@dataclasses.dataclass
-class FlagRequest:
-    challenge: int
-    content: str
-    type: str
-    data: typing.Optional[str] = dataclasses.field(default=None)
-
-
-def build_flag_requests(
+def build_flags(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Tuple[typing.List[FlagRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[CTFdFlag], typing.Sequence[LibError]]:
     output = []
     errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
         for flag_def in challenge.flags:
-            for flag in BuildFlag.build(context.challenge_path, flag_def):
+            for flag in flag_def.build(FlagContext(root=context.challenge_path)):
                 output.append(
-                    FlagRequest(
-                        challenge=id,
+                    CTFdFlag(
+                        id=-1,
+                        challenge_id=id,
                         content=flag,
-                        type="regex" if flag_def.regex else "static",
-                        data="" if flag_def.case_sensitive else "case_insensitive",
+                        type=(
+                            CTFdFlagType.Regex
+                            if flag_def.regex
+                            else CTFdFlagType.Static
+                        ),
+                        data=(
+                            CTFdFlagData.CaseSensitive
+                            if flag_def.case_sensitive
+                            else CTFdFlagData.CaseInsensitive
+                        ),
                     )
                 )
 
     return output, errors
 
 
-def send_flag_requests(
-    reqs: typing.List[FlagRequest], context: Context
+def send_flags(
+    reqs: typing.List[CTFdFlag], context: Context
 ) -> typing.Sequence[LibError]:
-    errors: typing.List[LibError] = []
-
     challenge_ids: typing.Set[int] = set()
     for req in reqs:
-        challenge_ids.add(req.challenge)
+        if req.challenge_id is not None:
+            challenge_ids.add(req.challenge_id)
 
     for challenge_id in challenge_ids:
-        res = context.session.get("/flags", data={"challenge_id": challenge_id})
+        flags, _ = context.api.get_flags_in_challenge(challenge_id)
 
-        if res.status_code != 200:
-            continue
+        if flags:
+            for flag in flags:
+                context.api.delete_flag(flag.id)
 
-        for flag_api in res.json()["data"]:
-            context.session.delete(f"/flags/{flag_api['id']}")
+    errors: typing.List[LibError] = []
+    for req in reqs:
+        _, res_errors = context.api.create_flag(req)
 
-    for i, req in enumerate(reqs):
-        res = context.session.post(
-            "/flags",
-            data=dataclasses.asdict(req),
-        )
-
-        if res_errors := ctfd_errors(
-            res, context=f"Flag {i} of challenge {req.challenge}"
-        ):
-            errors += res_errors
-            continue
+        errors += res_errors
 
     return errors
 
 
-@dataclasses.dataclass
-class AttachmentRequest:
-    challenge: int
-    type: str
-    file_name: str
-    file_data: typing.BinaryIO
-
-
-def build_attachment_requests(
+def build_attachments(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Tuple[typing.List[AttachmentRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[CTFdFileUpload], typing.Sequence[LibError]]:
     errors: typing.List[LibError] = []
-    reqs: typing.List[AttachmentRequest] = []
+    reqs: typing.List[CTFdFileUpload] = []
 
     for id, challenge in zip(ids, track.challenges):
         for i, attachment in enumerate(challenge.attachments):
             if (
-                out := BuildAttachment.get(attachment).build(
-                    context.challenge_path, attachment
+                handle := attachment.build(
+                    AttachmentContext(root=context.challenge_path)
                 )
             ) is None:
                 errors.append(
@@ -259,67 +227,52 @@ def build_attachment_requests(
                 )
                 continue
 
-            name, fh = out
-
             reqs.append(
-                AttachmentRequest(
-                    challenge=id, type="challenge", file_name=name, file_data=fh
+                CTFdFileUpload(
+                    challenge=id,
+                    type=CTFdFileUploadType.Challenge,
+                    file_name=handle.name,
+                    file_data=handle.data,
                 )
             )
 
     return reqs, errors
 
 
-def send_attachment_requests(
-    reqs: typing.Sequence[AttachmentRequest], context: Context
+def send_attachments(
+    reqs: typing.Sequence[CTFdFileUpload], context: Context
 ) -> typing.Sequence[LibError]:
-    errors: typing.List[LibError] = []
-
     challenge_ids: typing.Set[int] = set()
     for req in reqs:
         challenge_ids.add(req.challenge)
 
     for challenge_id in challenge_ids:
-        res = context.session.get(f"/challenges/{challenge_id}/files")
+        files, _ = context.api.get_files_in_challenge(challenge_id)
 
-        if res.status_code != 200:
-            continue
+        if files:
+            for file in files:
+                context.api.delete_file(file.id)
 
-        for files_api in res.json()["data"]:
-            context.session.delete(f"/files/{files_api['id']}")
+    errors: typing.List[LibError] = []
+    for req in reqs:
+        _, res_errors = context.api.create_file(req)
 
-    for i, req in enumerate(reqs):
-        res = context.session.post_data(
-            "/files",
-            data={"challenge": req.challenge, "type": req.type},
-            files={"file": (req.file_name, req.file_data)},
-        )
-
-        if res_errors := ctfd_errors(
-            res, context=f"Attachment {i} of challenge {req.challenge}"
-        ):
-            errors += res_errors
-            continue
+        errors += res_errors
 
     return errors
 
 
-@dataclasses.dataclass
-class HintRequest:
-    challenge_id: int
-    content: str
-    cost: int
-
-
-def build_hint_requests(
+def build_hints(
     track: Track, ids: typing.List[int], context: Context
-) -> typing.Tuple[typing.List[HintRequest], typing.Sequence[LibError]]:
+) -> typing.Tuple[typing.List[CTFdHint], typing.Sequence[LibError]]:
     errors: typing.List[LibError] = []
 
-    reqs: typing.List[HintRequest] = []
+    reqs: typing.List[CTFdHint] = []
     for id, challenge in zip(ids, track.challenges):
         for i, hint in enumerate(challenge.hints):
-            content = build_translation(context.challenge_path, hint.texts)
+            content = Text.build_many(
+                hint.texts, TextContext(root=context.challenge_path)
+            )
             if content is None:
                 errors.append(
                     BuildError(
@@ -328,40 +281,33 @@ def build_hint_requests(
                 )
                 continue
 
-            reqs.append(HintRequest(challenge_id=id, content=content, cost=hint.cost))
+            reqs.append(
+                CTFdHint(id=-1, challenge_id=id, content=content, cost=hint.cost)
+            )
 
     return reqs, errors
 
 
-def send_hint_requests(
-    reqs: typing.Sequence[HintRequest], context: Context
+def send_hints(
+    reqs: typing.Sequence[CTFdHint], context: Context
 ) -> typing.Sequence[LibError]:
-    errors: typing.List[LibError] = []
-
     challenge_ids: typing.Set[int] = set()
     for req in reqs:
-        challenge_ids.add(req.challenge_id)
+        if req.challenge_id is not None:
+            challenge_ids.add(req.challenge_id)
 
     for challenge_id in challenge_ids:
-        res = context.session.get("/hints", data={"challenge_id": challenge_id})
+        hints, _ = context.api.get_hints_in_challenge(challenge_id)
 
-        if res.status_code != 200:
-            continue
+        if hints:
+            for hint in hints:
+                context.api.delete_hint(hint.id)
 
-        for flag_api in res.json()["data"]:
-            context.session.delete(f"/hints/{flag_api['id']}")
+    errors: typing.List[LibError] = []
+    for req in reqs:
+        _, res_errors = context.api.create_hint(req)
 
-    for i, req in enumerate(reqs):
-        res = context.session.post(
-            "/hints",
-            data=dataclasses.asdict(req),
-        )
-
-        if res_errors := ctfd_errors(
-            res, context=f"Hint {i} of challenge {req.challenge_id}"
-        ):
-            errors += res_errors
-            continue
+        errors += res_errors
 
     return errors
 
@@ -372,6 +318,8 @@ def send_references(
     errors: typing.List[LibError] = []
 
     for id, challenge in zip(ids, track.challenges):
+        ctfd_challenge = CTFdChallenge(id=id)
+
         prerequisites = []
         for offset in challenge.prerequisites:
             if offset >= len(ids):
@@ -386,16 +334,9 @@ def send_references(
             prerequisites.append(ids[offset])
 
         if prerequisites:
-            res = context.session.patch(
-                f"/challenges/{id}",
-                data={
-                    "requirements": {"anonymize": True, "prerequisites": prerequisites}
-                },
+            ctfd_challenge.requirements = CTFdChallengeRequirements(
+                anonymize=True, prerequisites=prerequisites
             )
-
-            if res_errors := ctfd_errors(res, context=f"Challenge {id}"):
-                errors += res_errors
-                continue
 
         if challenge.next is not None:
             if challenge.next < 0 or challenge.next >= len(ids):
@@ -407,42 +348,38 @@ def send_references(
                 )
                 continue
 
-            res = context.session.patch(
-                f"/challenges/{id}",
-                {"next_id": ids[challenge.next]},
-            )
+            ctfd_challenge.next_id = ids[challenge.next]
 
-            if res_errors := ctfd_errors(res, context=f"Challenge {id}"):
-                errors += res_errors
-                continue
+        if prerequisites or challenge.next:
+            _, res_errors = context.api.update_challenge(ctfd_challenge)
+
+            errors += res_errors
 
     return errors
 
 
 def deploy_challenge(track: Track, context: Context) -> typing.Sequence[LibError]:
-    create_requests, errors = build_challenge_requests(track, context)
+    create_requests, errors = build_challenges(track, context)
     if errors:
         return errors
 
-    challenge_ids, errors = send_challenge_requests(create_requests, context)
+    challenge_ids, errors = send_challenges(create_requests, context)
     if errors:
         return errors
 
     all_errors: typing.List[LibError] = []
 
-    flag_requests, errors = build_flag_requests(track, challenge_ids, context)
+    flag_requests, errors = build_flags(track, challenge_ids, context)
     all_errors += errors
-    all_errors += send_flag_requests(flag_requests, context)
+    all_errors += send_flags(flag_requests, context)
 
-    attachment_requests, errors = build_attachment_requests(
-        track, challenge_ids, context
-    )
+    attachment_requests, errors = build_attachments(track, challenge_ids, context)
     all_errors += errors
-    all_errors += send_attachment_requests(attachment_requests, context)
+    all_errors += send_attachments(attachment_requests, context)
 
-    hint_requests, errors = build_hint_requests(track, challenge_ids, context)
+    hint_requests, errors = build_hints(track, challenge_ids, context)
     all_errors += errors
-    all_errors += send_hint_requests(hint_requests, context)
+    all_errors += send_hints(hint_requests, context)
 
     all_errors += send_references(track, challenge_ids, context)
 
@@ -476,7 +413,11 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         challenge_path="",
         error_prefix=[],
         skip_inactive=False,
-        session=CTFdAPI(args.url, args.api_key),
+        api=CTFdAPI(
+            CTFdSession(
+                url=args.url, access_token=CTFdAccessToken(id=-1, value=args.api_key)
+            )
+        ),
         port=args.port,
     )
 

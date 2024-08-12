@@ -19,7 +19,8 @@ from ctf_builder.cmd.ctfd.setup import cli as setup_cli
 from ctf_builder.cmd.ctfd.teams import Args as TeamsArgs
 from ctf_builder.cmd.ctfd.teams import cli as teams_cli
 from ctf_builder.config import CHALLENGE_BASE_PORT
-from ctf_builder.ctfd import ctfd_container, generate_key
+from ctf_builder.ctfd.api import CTFdAPI
+from ctf_builder.ctfd.docker import ctfd_container
 
 
 TEST_NAME = "test"
@@ -30,7 +31,7 @@ TEST_URL = f"http://localhost:{TEST_PORT}/"
 TEST_CHALLENGES: typing.List[str] = []
 
 
-def test_dev() -> None:
+def test_ctfd_dev() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )
@@ -44,7 +45,7 @@ def test_dev() -> None:
     assert dev_cli(cli_context=context, args=DevArgs(port=TEST_PORT, exit=True))
 
 
-def test_deploy() -> None:
+def test_ctfd_deploy() -> None:
     root_directory = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "..", "..", "sample"
     )
@@ -71,17 +72,15 @@ def test_deploy() -> None:
             ),
         )
 
-        # Generate a token for admin account
-        token = generate_key(TEST_URL, name=TEST_NAME, password=TEST_PASSWORD)
-        assert token, "Failed to generate api key"
-
-        api_key = token[1]
+        # Connect to API
+        api = CTFdAPI.login(TEST_URL, name=TEST_NAME, password=TEST_PASSWORD)
+        assert api, "Failed to generate api key"
 
         # Deploy teams
         with tempfile.TemporaryDirectory() as temp_dir:
             output = os.path.join(temp_dir, "teams.json")
             team_args = TeamsArgs(
-                api_key=api_key,
+                api_key=api.session.access_token.value or "",
                 file=os.path.join(context.root_directory, "ctfd", "teams.json"),
                 output=output,
                 url=TEST_URL,
@@ -112,7 +111,7 @@ def test_deploy() -> None:
 
         # Deploy challenges
         challenge_args = ChallengesArgs(
-            api_key=api_key,
+            api_key=api.session.access_token.value or "",
             url=TEST_URL,
             port=CHALLENGE_BASE_PORT,
             challenge=TEST_CHALLENGES,

@@ -14,7 +14,9 @@ import rich.markup
 import rich.progress
 
 from ...config import CHALLENGE_BASE_PORT
-from ...ctfd import ctfd_container, generate_key
+from ...ctfd.api import CTFdAPI
+from ...ctfd.docker import ctfd_container
+from ...ctfd.models import CTFdSetup, CTFdSetupUserMode, CTFdSetupVisibility
 from ...error import DeployError, LibError, get_exit_status, print_errors
 from ..common import (
     ArgumentError,
@@ -26,7 +28,6 @@ from ..common import (
 from .challenges import Args as ChallengesArgs
 from .challenges import cli as challenges_cli
 from .setup import Args as SetupArgs
-from .setup import SetupData
 from .setup import cli as setup_cli
 
 
@@ -38,14 +39,14 @@ class Args:
     base_port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
 
 
-DEV_SETUP = SetupData(
+DEV_SETUP = CTFdSetup(
     ctf_name="ctf-builder",
     ctf_description="Development environment for ctf-builder",
-    user_mode="users",
-    challenge_visibility="public",
-    score_visibility="admins",
-    account_visibility="admins",
-    registration_visibility="public",
+    user_mode=CTFdSetupUserMode.Users,
+    challenge_visibility=CTFdSetupVisibility.Public,
+    score_visibility=CTFdSetupVisibility.Admins,
+    account_visibility=CTFdSetupVisibility.Admins,
+    registration_visibility=CTFdSetupVisibility.Public,
     verify_emails=False,
 )
 
@@ -93,7 +94,7 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
         with tempfile.TemporaryDirectory() as temp_dir:
             setup_path = os.path.join(temp_dir, "setup.json")
             with open(setup_path, "w") as h:
-                json.dump(dataclasses.asdict(DEV_SETUP), h)
+                h.write(DEV_SETUP.model_dump_json())
 
             setup_status = setup_cli(
                 cli_context=cli_context,
@@ -109,28 +110,24 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
         if not setup_status:
             return [DeployError(context="setup", msg="failed to deploy")]
 
-        # Generate API Key
+        # Generate API
         start_time = time.time()
-        token = generate_key(url=ctfd_url, name=DEV_NAME, password=DEV_PASSWORD)
+        api = CTFdAPI.login(url=ctfd_url, name=DEV_NAME, password=DEV_PASSWORD)
         end_time = time.time()
 
-        token_errors = (
-            [DeployError(context="token", msg="failed to get")] if token is None else []
-        )
-        print_errors(
-            prefix=["token"],
-            errors=token_errors,
-            console=cli_context.console,
-            elapsed_time=end_time - start_time,
-        )
-        if token is None:
-            return token_errors
-
-        _, api_key = token
+        if api is None:
+            login_errors = [DeployError(context="Credentaisl", msg="failed")]
+            print_errors(
+                prefix=["login"],
+                errors=login_errors,
+                console=cli_context.console,
+                elapsed_time=end_time - start_time,
+            )
+            return login_errors
 
         # Deploy challenges
         challenge_args = ChallengesArgs(
-            api_key=api_key,
+            api_key=api.session.access_token.value or "",
             url=ctfd_url,
             port=args.base_port,
             challenge=args.challenge,

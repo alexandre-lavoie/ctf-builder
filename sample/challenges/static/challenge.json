@@ -8,11 +8,11 @@
       "value": 0,
       "descriptions": [
         {
-          "$type": "english",
+          "language": "en",
           "path": "text/CHAL-EN.md"
         },
         {
-          "$type": "french",
+          "language": "fr",
           "path": "text/CHAL-FR.md"
         }
       ],
@@ -21,7 +21,7 @@
           "case_sensitive": true,
           "regex": false,
           "values": {
-            "$type": "env",
+            "type": "env",
             "path": "FLAG",
             "keys": [
               "FLAG"
@@ -31,12 +31,12 @@
       ],
       "attachments": [
         {
-          "$type": "directory",
+          "type": "directory",
           "path": "challenge",
           "name": "source.zip"
         },
         {
-          "$type": "file",
+          "type": "file",
           "path": "build/challenge",
           "name": "challenge"
         }
@@ -46,11 +46,11 @@
           "cost": 0,
           "texts": [
             {
-              "$type": "english",
+              "language": "en",
               "path": "text/HINT-EN.md"
             },
             {
-              "$type": "french",
+              "language": "fr",
               "path": "text/HINT-FR.md"
             }
           ]
@@ -60,7 +60,7 @@
   ],
   "build": [
     {
-      "$type": "docker",
+      "type": "docker",
       "path": "Dockerfile.build",
       "files": [
         {
@@ -70,7 +70,7 @@
       ],
       "args": [
         {
-          "$type": "env",
+          "type": "env",
           "path": "FLAG",
           "keys": [
             "FLAG"
@@ -81,7 +81,7 @@
   ],
   "test": [
     {
-      "$type": "docker",
+      "type": "docker",
       "path": "Dockerfile.test"
     }
   ]

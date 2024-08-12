@@ -1,4 +1,5 @@
 {
+  "$schema": "../doc/teams.json",
   "teams": [
     {
       "name": "team",
@@ -7,6 +8,20 @@
         {
           "name": "user",
           "email": "user@ctf.com"
+        },
+        {
+          "name": "user2",
+          "email": "user2@ctf.com"
+        }
+      ]
+    },
+    {
+      "name": "team2",
+      "email": "team2@ctf.com",
+      "users": [
+        {
+          "name": "user3",
+          "email": "user3@ctf.com"
         }
       ]
     }
