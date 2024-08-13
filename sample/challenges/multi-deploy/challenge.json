@@ -62,6 +62,12 @@
       "type": "docker",
       "name": "multi-deploy-app",
       "path": "challenge/server/Dockerfile",
+      "ports": [
+        {
+          "type": "tcp",
+          "value": 9001
+        }
+      ],
       "env": [
         {
           "type": "env",
@@ -85,6 +91,7 @@
       "ports": [
         {
           "type": "tcp",
+          "public": true,
           "value": 9001
         }
       ],

@@ -1,3 +1,4 @@
+import math
 import os.path
 import typing
 
@@ -7,11 +8,29 @@ import pydantic
 
 from ...docker import to_docker_tag
 from ...error import BuildError, DeployError, LibError, SkipError
+from ...k8s.models import (
+    K8sContainer,
+    K8sContainerEnv,
+    K8sContainerLivenessProbe,
+    K8sContainerLivenessProbeExec,
+    K8sContainerPort,
+    K8sDeployment,
+    K8sDeploymentSpec,
+    K8sList,
+    K8sMatchSelector,
+    K8sMetadata,
+    K8sPodSpec,
+    K8sPodTemplate,
+    K8sService,
+    K8sServicePort,
+    K8sServiceSpec,
+    K8sServiceType,
+)
 from ..arguments import ArgumentContext, Arguments
 from ..healthcheck import Healthcheck
 from ..path import FilePath, PathContext
 from ..port import Port
-from .base import BaseDeploy, DockerDeployContext
+from .base import BaseDeploy, DockerDeployContext, K8sDeployContext
 
 
 class DeployDocker(BaseDeploy):
@@ -20,9 +39,6 @@ class DeployDocker(BaseDeploy):
     """
 
     type: typing.Literal["docker"]
-    name: typing.Optional[str] = pydantic.Field(
-        default=None, description="Hostname on network"
-    )
     path: typing.Optional[FilePath] = pydantic.Field(
         default=None, description="Path to Dockerfile"
     )
@@ -43,14 +59,18 @@ class DeployDocker(BaseDeploy):
         default=None, description=("Healtcheck for Dockerfile")
     )
 
-    def get_dns_name(self, context: DockerDeployContext) -> str:
+    def get_tag_name(
+        self, context: typing.Union[DockerDeployContext, K8sDeployContext]
+    ) -> str:
         return to_docker_tag(context.name)
 
-    def get_container_name(self, context: DockerDeployContext) -> str:
-        if context.network:
-            return to_docker_tag(f"{context.network}_{context.name}")
+    def get_container_name(
+        self, context: typing.Union[DockerDeployContext, K8sDeployContext]
+    ) -> str:
+        if isinstance(context, DockerDeployContext) and context.network:
+            return to_docker_tag(f"{context.network}-{context.name}")
 
-        return self.get_dns_name(context)
+        return self.get_tag_name(context)
 
     def get_ports(self) -> typing.Sequence[Port]:
         return self.ports
@@ -92,7 +112,7 @@ class DeployDocker(BaseDeploy):
         return os.path.abspath(dockerfile), []
 
     def __build_image(
-        self, context: DockerDeployContext, dockerfile: str
+        self, context: DockerDeployContext, dockerfile: str, tag: bool
     ) -> typing.Tuple[
         typing.Optional[docker.models.images.Image], typing.Sequence[LibError]
     ]:
@@ -117,6 +137,7 @@ class DeployDocker(BaseDeploy):
 
         try:
             image, _ = context.docker_client.images.build(
+                tag=self.get_tag_name(context) if tag else None,
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,
@@ -135,7 +156,9 @@ class DeployDocker(BaseDeploy):
         if context.docker_client is None or not dockerfile:
             return docker_errors
 
-        image, image_errors = self.__build_image(context, dockerfile)
+        image, image_errors = self.__build_image(
+            context=context, dockerfile=dockerfile, tag=context.tag
+        )
         if not image:
             return image_errors
 
@@ -155,6 +178,9 @@ class DeployDocker(BaseDeploy):
         port_bindings = {}
         if context.host:
             for port in self.ports:
+                if not port.public:
+                    continue
+
                 port_bindings[port.value] = (context.host, next(context.port_generator))
 
         if errors:
@@ -162,15 +188,12 @@ class DeployDocker(BaseDeploy):
 
         aliases = []
 
-        dns_name = self.get_dns_name(context)
+        dns_name = self.get_tag_name(context)
         aliases.append(dns_name)
 
         container_name = self.get_container_name(context)
         if container_name != dns_name:
             aliases.append(container_name)
-
-        if self.name:
-            aliases.append(to_docker_tag(self.name))
 
         try:
             context.docker_client.containers.run(
@@ -249,8 +272,114 @@ class DeployDocker(BaseDeploy):
         if not dockerfile:
             return docker_errors
 
-        image, image_errors = self.__build_image(context, dockerfile)
+        image, image_errors = self.__build_image(
+            context=context, dockerfile=dockerfile, tag=context.tag
+        )
         if not image:
             return image_errors
 
         return []
+
+    def k8s_build(
+        self, context: K8sDeployContext
+    ) -> typing.Tuple[typing.Optional[K8sList], typing.Sequence[LibError]]:
+        errors: typing.List[LibError] = []
+
+        environment = {}
+        for env in self.env:
+            if (arg_map := env.build(ArgumentContext(root=context.root))) is None:
+                errors.append(
+                    BuildError(context=context.name, msg="invalid environment")
+                )
+                break
+
+            for key, value in arg_map.items():
+                environment[key] = value
+
+        if errors:
+            return None, errors
+
+        labels = {
+            "type": "challenge",
+            "track": to_docker_tag(context.track),
+            "challenge": self.get_tag_name(context),
+        }
+
+        container = K8sContainer(
+            name=self.get_tag_name(context),
+            image=self.get_tag_name(context),
+            ports=[
+                K8sContainerPort(
+                    name=(
+                        f"p-{next(context.port_generator)}"
+                        if port.public
+                        else f"p-{port.value}"
+                    ),
+                    containerPort=port.value,
+                )
+                for port in self.ports
+            ],
+            env=[
+                K8sContainerEnv(name=key, value=value)
+                for key, value in environment.items()
+            ],
+            livenessProbe=(
+                K8sContainerLivenessProbe(
+                    exec=K8sContainerLivenessProbeExec(
+                        command=["/bin/sh", "-c", self.healthcheck.test]
+                    ),
+                    initialDelaySeconds=math.ceil(self.healthcheck.start_period),
+                    periodSeconds=math.ceil(self.healthcheck.interval),
+                    successThreshold=1,
+                    failureThreshold=self.healthcheck.retries,
+                )
+                if self.healthcheck
+                else None
+            ),
+        )
+
+        deployment = K8sDeployment(
+            apiVersion="apps/v1",
+            kind="Deployment",
+            metadata=K8sMetadata(name=self.get_tag_name(context), labels=labels),
+            spec=K8sDeploymentSpec(
+                replicas=1,
+                selector=K8sMatchSelector(
+                    matchLabels={"challenge": self.get_tag_name(context)}
+                ),
+                template=K8sPodTemplate(
+                    metadata=K8sMetadata(
+                        name=self.get_tag_name(context), labels=labels
+                    ),
+                    spec=K8sPodSpec(containers=[container]),
+                ),
+            ),
+        )
+
+        service = K8sService(
+            apiVersion="v1",
+            kind="Service",
+            metadata=K8sMetadata(name=self.get_tag_name(context), labels=labels),
+            spec=K8sServiceSpec(
+                type=K8sServiceType.ClusterIP,
+                selector={"challenge": self.get_tag_name(context)},
+                ports=[
+                    K8sServicePort(
+                        name=f"p-{port.value}",
+                        protocol=port.k8s_port_protocol(),
+                        port=port.value,
+                        targetPort=port.value,
+                    )
+                    for port in self.ports
+                ],
+            ),
+        )
+
+        out = K8sList(
+            apiVersion="v1",
+            kind="List",
+            metadata=K8sMetadata(),
+            items=[deployment, service],
+        )
+
+        return out, []

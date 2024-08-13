@@ -6,6 +6,7 @@ import docker
 import pydantic
 
 from ...error import LibError
+from ...k8s.models import K8sKind
 from ..port import Port
 
 
@@ -23,6 +24,17 @@ class DockerDeployContext:
     )
     network: typing.Optional[str] = dataclasses.field(default=None)
     host: typing.Optional[str] = dataclasses.field(default=None)
+    port_generator: typing.Generator[typing.Optional[int], None, None] = (
+        dataclasses.field(default_factory=lambda: default_port_generator())
+    )
+    tag: bool = dataclasses.field(default=True)
+
+
+@dataclasses.dataclass
+class K8sDeployContext:
+    name: str
+    root: str
+    track: str
     port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )
@@ -59,4 +71,10 @@ class BaseDeploy(abc.ABC, pydantic.BaseModel):
 
     @abc.abstractmethod
     def docker_deploy(self, context: DockerDeployContext) -> typing.Sequence[LibError]:
+        pass
+
+    @abc.abstractmethod
+    def k8s_build(
+        self, context: K8sDeployContext
+    ) -> typing.Tuple[typing.Optional[K8sKind], typing.Sequence[LibError]]:
         pass

@@ -43,7 +43,7 @@ def test_start_stop() -> None:
         console=rich.console.Console(quiet=True),
     )
 
-    network = str(f"ctf-builder_test_{uuid.uuid4()}")
+    network = str(f"ctf-builder_test-{uuid.uuid4()}")
 
     try:
         assert start_cli(

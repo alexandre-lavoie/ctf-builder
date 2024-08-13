@@ -31,7 +31,7 @@ def deploy(track: Track, context: Context) -> typing.Sequence[LibError]:
     for i, deployer in enumerate(track.deploy):
         errors += deployer.docker_deploy(
             DockerDeployContext(
-                name=f"{track.tag or track.name}_{i}",
+                name=f"{track.tag or track.name}-{i}",
                 root=context.challenge_path,
                 docker_client=context.docker_client,
                 network=None,

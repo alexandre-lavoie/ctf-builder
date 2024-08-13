@@ -7,6 +7,7 @@ import docker
 import docker.errors
 import pydantic
 
+from ...docker import to_docker_tag
 from ...error import BuildError, LibError, TestError
 from ..arguments import ArgumentContext, Arguments
 from ..flag import FlagContext
@@ -134,7 +135,7 @@ class TestDocker(BaseTest):
                 environment[key] = value
 
         try:
-            image, logs = context.docker_client.images.build(
+            image, _ = context.docker_client.images.build(
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,
@@ -178,7 +179,7 @@ class TestDocker(BaseTest):
                     )
                     continue
 
-                challenge_host = f"host_{challenge.host.index}"
+                challenge_host = to_docker_tag(f"{context.name}-{challenge.host.index}")
 
                 deployer = context.deployers[challenge.host.index]
 

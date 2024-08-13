@@ -136,6 +136,14 @@ The shorthand version can also be used.
 ctf start -n team1 -i 192.168.0.2 -n team2 -i 192.168.0.3 ...
 ```
 
+## ⚓ Kubernetes
+
+```
+ctf kubernetes build
+```
+
+Deploys challenges to [Kubernetes](https://kubernetes.io/). This is the most robust way to deploy challenges.
+
 ## 🚩 CTFd
 
 [CTFd](https://ctfd.io/) is supported out of the box. This allows to automate deploying challenges.
