@@ -7,6 +7,7 @@ import docker
 import docker.errors
 import pydantic
 
+from ...docker import to_docker_tag
 from ...error import BuildError, LibError, TestError
 from ..arguments import ArgumentContext, Arguments
 from ..flag import FlagContext
@@ -178,7 +179,7 @@ class TestDocker(BaseTest):
                     )
                     continue
 
-                challenge_host = f"{context.name}-{challenge.host.index}"
+                challenge_host = to_docker_tag(f"{context.name}-{challenge.host.index}")
 
                 deployer = context.deployers[challenge.host.index]
 
