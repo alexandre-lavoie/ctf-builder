@@ -139,7 +139,7 @@ ctf start -n team1 -i 192.168.0.2 -n team2 -i 192.168.0.3 ...
 ## ⚓ Kubernetes
 
 ```
-ctf kubernetes build
+ctf k8s build
 ```
 
 Deploys challenges to [Kubernetes](https://kubernetes.io/). This is the most robust way to deploy challenges.

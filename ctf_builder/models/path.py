@@ -41,4 +41,4 @@ class FilePath(pydantic.RootModel[str]):
         return path
 
 
-Path: typing.TypeAlias = typing.Union[DirectoryPath, FilePath]
+Path = typing.Union[DirectoryPath, FilePath]

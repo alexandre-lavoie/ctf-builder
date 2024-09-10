@@ -1,7 +1,7 @@
 import argparse
 import dataclasses
-import glob
 import json
+import os
 import os.path
 import threading
 import time
@@ -109,7 +109,14 @@ def get_challenges(root_directory: str) -> typing.Optional[typing.Sequence[str]]
     if not os.path.isdir(challenge_directory):
         return None
 
-    return [name for name in glob.glob("*", root_dir=challenge_directory)]
+    challenges = []
+    for _, directories, _ in os.walk(challenge_directory):
+        for directory in directories:
+            challenges.append(directory)
+
+        break
+
+    return challenges
 
 
 def get_challenge_index(challenge_path: str) -> int:

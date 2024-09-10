@@ -93,6 +93,4 @@ class WSSPort(BasePort):
         return K8sPortProtocol.TCP
 
 
-Port: typing.TypeAlias = typing.Union[
-    HTTPPort, HTTPSPort, TCPPort, UDPPort, WSPort, WSSPort
-]
+Port = typing.Union[HTTPPort, HTTPSPort, TCPPort, UDPPort, WSPort, WSSPort]

@@ -1,7 +1,7 @@
 import abc
 import dataclasses
-import glob
 import io
+import os
 import os.path
 import typing
 import zipfile
@@ -51,13 +51,16 @@ class DirectoryAttachment(BaseAttachment):
 
         data = io.BytesIO()
         with zipfile.ZipFile(data, "w") as zh:
-            for rel_path in glob.glob("**/*", root_dir=path, recursive=True):
-                abs_path = os.path.join(path, rel_path)
-                if not os.path.isfile(abs_path):
-                    continue
+            for abs_root, _, files in os.walk(path):
+                rel_root = abs_root[len(path) :]
 
-                with open(abs_path, "rb") as rh, zh.open(rel_path, "w") as wh:
-                    wh.write(rh.read())
+                for file in files:
+                    rel_path = os.path.join(rel_root, file)
+                    abs_path = os.path.join(abs_root, file)
+
+                    with open(abs_path, "rb") as rh, zh.open(rel_path, "w") as wh:
+                        wh.write(rh.read())
+
         data.seek(0)
 
         if self.name is not None:
@@ -94,4 +97,4 @@ class FileAttachment(BaseAttachment):
         return AttachmentHandle(name=name, data=io.BytesIO(data))
 
 
-Attachment: typing.TypeAlias = typing.Union[DirectoryAttachment, FileAttachment]
+Attachment = typing.Union[DirectoryAttachment, FileAttachment]
