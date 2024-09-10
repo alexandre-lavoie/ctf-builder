@@ -78,6 +78,4 @@ class MapArguments(BaseArguments):
         return self.map
 
 
-Arguments: typing.TypeAlias = typing.Union[
-    EnvFileArguments, ListArguments, MapArguments
-]
+Arguments = typing.Union[EnvFileArguments, ListArguments, MapArguments]

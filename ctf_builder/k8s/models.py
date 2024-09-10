@@ -44,7 +44,7 @@ class K8sMatchSelector(pydantic.BaseModel):
     matchLabels: typing.Dict[str, str]
 
 
-K8sDictSelector: typing.TypeAlias = typing.Dict[str, str]
+K8sDictSelector = typing.Dict[str, str]
 
 
 class K8sConfigMap(pydantic.BaseModel):
@@ -241,6 +241,6 @@ class K8sNetworkPolicy(pydantic.BaseModel):
     spec: K8sNetworkPolicySpec
 
 
-K8sKind: typing.TypeAlias = typing.Union[
+K8sKind = typing.Union[
     K8sConfigMap, K8sDeployment, K8sList, K8sNetworkPolicy, K8sPod, K8sService
 ]
