@@ -1,4 +1,5 @@
 {
+  "$schema": "../doc/setup.json",
   "ctf_name": "Sample CTF",
   "ctf_description": "Sample CTF",
   "user_mode": "teams",
@@ -6,7 +7,7 @@
   "score_visibility": "admins",
   "account_visibility": "admins",
   "registration_visibility": "private",
-  "verify_emails": "false",
+  "verify_emails": false,
   "ctf_logo": "images/logo.svg",
   "ctf_banner": "",
   "ctf_small_icon": "images/logo.svg",
