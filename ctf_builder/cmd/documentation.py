@@ -3,6 +3,7 @@ import dataclasses
 import json
 import os.path
 
+from ..ctfd.models import CTFdSetup
 from ..models.challenge import Track
 from ..models.team import TeamFile
 from .common import CliContext
@@ -33,5 +34,8 @@ def cli(args: Args, cli_context: CliContext) -> bool:
 
     with open(os.path.join(args.output, "teams.json"), "w") as h:
         json.dump(TeamFile.model_json_schema(), h, indent=2)
+
+    with open(os.path.join(args.output, "setup.json"), "w") as h:
+        json.dump(CTFdSetup.model_json_schema(), h, indent=2)
 
     return True

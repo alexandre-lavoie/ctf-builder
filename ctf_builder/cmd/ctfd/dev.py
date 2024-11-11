@@ -1,6 +1,5 @@
 import argparse
 import dataclasses
-import json
 import os.path
 import tempfile
 import time
