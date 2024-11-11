@@ -5,6 +5,8 @@ import os.path
 import typing
 import uuid
 
+import pydantic_core
+
 from ...ctfd.api import CTFdAPI
 from ...ctfd.models import CTFdAccessToken, CTFdTeam, CTFdUser
 from ...ctfd.session import CTFdSession
@@ -76,27 +78,36 @@ def add_user_to_team(
 def deploy_team(
     team: CTFdTeam, users: typing.Sequence[CTFdUser], context: Context
 ) -> typing.Sequence[LibError]:
-    data, _ = context.api.get_teams_by_query(team.name or "")
+    try:
+        data, _ = context.api.get_teams_by_query(team.name or "")
 
-    res_errors: typing.Sequence[LibError]
-    if data and any(ctfd_team.name == team.name for ctfd_team in data):
-        for ctfd_team in data:
-            if ctfd_team.name == team.name:
-                break
+        solo = False
+    except pydantic_core.ValidationError:
+        solo = True
 
-        team.id = ctfd_team.id
+    if not solo:
+        res_errors: typing.Sequence[LibError]
 
-        res, res_errors = context.api.update_team(team)
+        if data and any(ctfd_team.name == team.name for ctfd_team in data):
+            for ctfd_team in data:
+                if ctfd_team.name == team.name:
+                    break
+
+            team.id = ctfd_team.id
+
+            res, res_errors = context.api.update_team(team)
+        else:
+            if not team.password:
+                team.password = str(uuid.uuid4())
+
+            res, res_errors = context.api.create_team(team)
+
+        if res is None:
+            return res_errors
+
+        team.id = res.id
     else:
-        if not team.password:
-            team.password = str(uuid.uuid4())
-
-        res, res_errors = context.api.create_team(team)
-
-    if res is None:
-        return res_errors
-
-    team.id = res.id
+        team.id = 0
 
     errors: typing.List[LibError] = []
     for user in users:
@@ -105,7 +116,8 @@ def deploy_team(
             errors += user_errors
             continue
 
-        errors += add_user_to_team(team.id, user.id, context)
+        if not solo:
+            errors += add_user_to_team(team.id, user.id, context)
 
     return errors
 
