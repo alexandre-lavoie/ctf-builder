@@ -2,7 +2,7 @@ import argparse
 import dataclasses
 import typing
 
-from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST, CHALLENGE_MAX_PORTS
+from ...config import CHALLENGE_BASE_PORT, CHALLENGE_MAX_PORTS
 from ...ctfd.api import CTFdAPI
 from ...ctfd.models import (
     CTFdAccessToken,
@@ -105,7 +105,7 @@ def build_challenges(
             port, port_value = deploy_ports[0]
             connection_info = port.connection_string(
                 ConnectionContext(
-                    host=CHALLENGE_HOST,
+                    host=context.api.session.hostname(),
                     port=port_value,
                     path=challenge.host.path,
                 )

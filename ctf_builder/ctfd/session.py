@@ -1,8 +1,10 @@
 import dataclasses
 import typing
+import urllib.parse
 
 import requests
 
+from ..config import CHALLENGE_HOST
 from .models import CTFdAccessToken
 
 
@@ -19,6 +21,9 @@ class CTFdSession:
 
     def __url(self, path: str) -> str:
         return f"{self.url}{VERSION}{path}"
+
+    def hostname(self) -> str:
+        return urllib.parse.urlparse(self.url).hostname or CHALLENGE_HOST
 
     def get(
         self, path: str, data: typing.Optional[typing.Dict[str, typing.Any]] = None
