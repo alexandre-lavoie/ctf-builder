@@ -18,7 +18,7 @@ from ctf_builder.cmd.ctfd.setup import Args as SetupArgs
 from ctf_builder.cmd.ctfd.setup import cli as setup_cli
 from ctf_builder.cmd.ctfd.teams import Args as TeamsArgs
 from ctf_builder.cmd.ctfd.teams import cli as teams_cli
-from ctf_builder.config import CHALLENGE_BASE_PORT
+from ctf_builder.config import CHALLENGE_BASE_PORT, CHALLENGE_HOST
 from ctf_builder.ctfd.api import CTFdAPI
 from ctf_builder.ctfd.docker import ctfd_container
 
@@ -26,8 +26,9 @@ from ctf_builder.ctfd.docker import ctfd_container
 TEST_NAME = "test"
 TEST_PASSWORD = "test"
 TEST_EMAIL = "test@ctf.com"
+TEST_HOST = CHALLENGE_HOST
 TEST_PORT = 9876
-TEST_URL = f"http://localhost:{TEST_PORT}/"
+TEST_URL = f"http://{TEST_HOST}:{TEST_PORT}/"
 TEST_CHALLENGES: typing.List[str] = []
 
 

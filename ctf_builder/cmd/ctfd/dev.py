@@ -13,7 +13,7 @@ import rich.control
 import rich.markup
 import rich.progress
 
-from ...config import CHALLENGE_BASE_PORT
+from ...config import CHALLENGE_BASE_PORT, CHALLENGE_HOST
 from ...ctfd.api import CTFdAPI
 from ...ctfd.docker import ctfd_container
 from ...ctfd.models import CTFdSetup, CTFdSetupUserMode, CTFdSetupVisibility
@@ -34,6 +34,7 @@ from .setup import cli as setup_cli
 @dataclasses.dataclass
 class Args:
     port: int
+    hostname: str = dataclasses.field(default=CHALLENGE_HOST)
     exit: bool = dataclasses.field(default=False)
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
     base_port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
@@ -58,7 +59,7 @@ DEV_EMAIL = "admin@ctfd.io"
 def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
     container: typing.Optional[docker.models.containers.Container] = None
 
-    ctfd_url = f"http://localhost:{args.port}"
+    ctfd_url = f"http://{args.hostname}:{args.port}"
 
     try:
         with rich.progress.Progress(
@@ -207,6 +208,9 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         choices=get_challenges(root_directory) or [],
         help="Name of challenges",
         default=[],
+    )
+    parser.add_argument(
+        "-n", "--hostname", type=str, help="Hostname of CTFd", default=CHALLENGE_HOST
     )
     parser.add_argument(
         "-b",
