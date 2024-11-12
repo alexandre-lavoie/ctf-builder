@@ -70,6 +70,7 @@ def test_ctfd_deploy() -> None:
                 password=TEST_PASSWORD,
                 file=os.path.join(context.root_directory, "ctfd", "setup.json"),
                 url=TEST_URL,
+                skip_ssl=True,
             ),
         )
 
@@ -85,6 +86,7 @@ def test_ctfd_deploy() -> None:
                 file=os.path.join(context.root_directory, "ctfd", "teams.json"),
                 output=output,
                 url=TEST_URL,
+                skip_ssl=True,
             )
 
             # First deploy
@@ -116,6 +118,7 @@ def test_ctfd_deploy() -> None:
             url=TEST_URL,
             port=CHALLENGE_BASE_PORT,
             challenge=TEST_CHALLENGES,
+            skip_ssl=True,
         )
 
         ## First Deploy

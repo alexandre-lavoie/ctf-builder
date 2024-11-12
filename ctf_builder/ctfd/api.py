@@ -47,11 +47,11 @@ class CTFdAPI:
 
     @classmethod
     def setup(
-        cls, url: str, data: CTFdSetup, root: str = ""
+        cls, url: str, data: CTFdSetup, root: str = "", verify_ssl: bool = True
     ) -> typing.Sequence[LibError]:
         sess = requests.Session()
 
-        if (nonce := cls.read_nonce(sess, f"{url}/setup")) is None:
+        if (nonce := cls.read_nonce(sess, f"{url}/setup", verify_ssl)) is None:
             return [DeployError(context="Nonce", msg="failed to get")]
 
         data.nonce = nonce
@@ -65,7 +65,7 @@ class CTFdAPI:
 
             files[key] = os.path.join(root, form[key])
 
-        res = sess.post(f"{url}/setup", data=form, files=files)
+        res = sess.post(f"{url}/setup", data=form, files=files, verify=verify_ssl)
 
         if res.status_code != 200:
             return [DeployError(context="Setup", msg="failed to deploy")]
@@ -312,16 +312,20 @@ class CTFdAPI:
         )
 
     @classmethod
-    def read_nonce(cls, sess: requests.Session, url: str) -> typing.Optional[str]:
-        res = sess.get(url)
+    def read_nonce(
+        cls, sess: requests.Session, url: str, verify_ssl: bool = True
+    ) -> typing.Optional[str]:
+        res = sess.get(url, verify=verify_ssl)
 
         match = NONCE_RE.findall(res.text)
 
         return match[0] if match else None
 
     @classmethod
-    def read_csrf(cls, sess: requests.Session, url: str) -> typing.Optional[str]:
-        res = sess.get(url)
+    def read_csrf(
+        cls, sess: requests.Session, url: str, verify_ssl: bool = True
+    ) -> typing.Optional[str]:
+        res = sess.get(url, verify=verify_ssl)
 
         match = CSRF_RE.findall(res.text)
 
@@ -329,19 +333,21 @@ class CTFdAPI:
 
     @classmethod
     def create_access_token_auth(
-        cls, url: str, name: str, password: str
+        cls, url: str, name: str, password: str, verify_ssl: bool = True
     ) -> typing.Optional[CTFdAccessToken]:
         sess = requests.Session()
 
-        nonce = cls.read_nonce(sess, f"{url}/login")
+        nonce = cls.read_nonce(sess, f"{url}/login", verify_ssl)
 
         res = sess.post(
-            f"{url}/login", data={"name": name, "password": password, "nonce": nonce}
+            f"{url}/login",
+            data={"name": name, "password": password, "nonce": nonce},
+            verify=verify_ssl,
         )
         if res.status_code != 200:
             return None
 
-        csrf = cls.read_csrf(sess, f"{url}/settings")
+        csrf = cls.read_csrf(sess, f"{url}/settings", verify_ssl)
 
         expiration = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(
             days=1
@@ -354,6 +360,7 @@ class CTFdAPI:
                 "description": "Created via ctf-builder",
                 "expiration": expiration.date().isoformat(),
             },
+            verify=verify_ssl,
         )
 
         data = CTFdResponse[CTFdAccessToken](**res.json())
