@@ -10,7 +10,13 @@ import pydantic_core
 from ...ctfd.api import CTFdAPI
 from ...ctfd.models import CTFdAccessToken, CTFdTeam, CTFdUser
 from ...ctfd.session import CTFdSession
-from ...error import DeployError, LibError, get_exit_status, print_errors
+from ...error import (
+    DeployError,
+    LibError,
+    disable_ssl_warnings,
+    get_exit_status,
+    print_errors,
+)
 from ...models.team import TeamFile
 from ..common import CliContext
 
@@ -21,6 +27,7 @@ class Args:
     file: str
     output: str
     url: str = dataclasses.field(default="http://localhost:8000")
+    skip_ssl: bool = dataclasses.field(default=False)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -179,9 +186,19 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         help="Output file",
         default=os.path.join(root_directory, "ctfd", "teams.out.json"),
     )
+    parser.add_argument(
+        "-s",
+        "--skip_ssl",
+        action="store_false",
+        help="Skip SSL check",
+        default=False,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
+    if args.skip_ssl:
+        disable_ssl_warnings()
+
     with open(args.file, "r") as h:
         config = json.load(h)
 

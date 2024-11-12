@@ -15,6 +15,7 @@ VERSION = "/api/v1"
 class CTFdSession:
     url: str
     access_token: CTFdAccessToken
+    verify_ssl: bool = dataclasses.field(default=True)
 
     def __headers(self) -> typing.Dict[str, str]:
         return {"Authorization": f"Token {self.access_token.value}"}
@@ -32,10 +33,16 @@ class CTFdSession:
             url=self.__url(path),
             headers={**self.__headers(), "Content-Type": "application/json"},
             params=data,
+            verify=self.verify_ssl,
         )
 
     def post(self, path: str, data: typing.Dict[str, typing.Any]) -> requests.Response:
-        return requests.post(url=self.__url(path), headers=self.__headers(), json=data)
+        return requests.post(
+            url=self.__url(path),
+            headers=self.__headers(),
+            json=data,
+            verify=self.verify_ssl,
+        )
 
     def post_data(
         self, path: str, data: typing.Dict[str, typing.Any], files: typing.Any
@@ -45,13 +52,20 @@ class CTFdSession:
             headers=self.__headers(),
             data=data,
             files=files,
+            verify=self.verify_ssl,
         )
 
     def patch(self, path: str, data: typing.Dict[str, typing.Any]) -> requests.Response:
-        return requests.patch(url=self.__url(path), headers=self.__headers(), json=data)
+        return requests.patch(
+            url=self.__url(path),
+            headers=self.__headers(),
+            json=data,
+            verify=self.verify_ssl,
+        )
 
     def delete(self, path: str) -> requests.Response:
         return requests.delete(
             url=self.__url(path),
             headers={**self.__headers(), "Content-Type": "application/json"},
+            verify=self.verify_ssl,
         )

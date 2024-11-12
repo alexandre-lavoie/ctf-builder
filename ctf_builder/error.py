@@ -3,6 +3,7 @@ import dataclasses
 import datetime
 import typing
 
+import requests
 import rich.columns
 import rich.console
 import rich.markup
@@ -184,3 +185,7 @@ def get_exit_status(errors: typing.Sequence[typing.Union[LibError]]) -> bool:
         return True
 
     return False
+
+
+def disable_ssl_warnings() -> None:
+    requests.packages.urllib3.disable_warnings()  # type: ignore

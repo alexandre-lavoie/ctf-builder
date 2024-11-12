@@ -16,7 +16,7 @@ from ...ctfd.models import (
     CTFdHint,
 )
 from ...ctfd.session import CTFdSession
-from ...error import BuildError, DeployError, LibError
+from ...error import BuildError, DeployError, LibError, disable_ssl_warnings
 from ...models.attachment import AttachmentContext
 from ...models.challenge import Track
 from ...models.flag import FlagContext
@@ -37,6 +37,7 @@ class Args:
     url: str = dataclasses.field(default="http://localhost:8000")
     port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    skip_ssl: bool = dataclasses.field(default=False)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -409,16 +410,28 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         help="Starting port for challenges",
         default=CHALLENGE_BASE_PORT,
     )
+    parser.add_argument(
+        "-s",
+        "--skip_ssl",
+        action="store_false",
+        help="Skip SSL check",
+        default=False,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
+    if args.skip_ssl:
+        disable_ssl_warnings()
+
     context = Context(
         challenge_path="",
         error_prefix=[],
         skip_inactive=False,
         api=CTFdAPI(
             CTFdSession(
-                url=args.url, access_token=CTFdAccessToken(id=-1, value=args.api_key)
+                url=args.url,
+                access_token=CTFdAccessToken(id=-1, value=args.api_key),
+                verify_ssl=not args.skip_ssl,
             )
         ),
         port=args.port,

@@ -7,7 +7,7 @@ import typing
 
 from ...ctfd.api import CTFdAPI
 from ...ctfd.models import CTFdSetup
-from ...error import LibError, get_exit_status, print_errors
+from ...error import LibError, disable_ssl_warnings, get_exit_status, print_errors
 from ..common import CliContext
 
 
@@ -18,6 +18,7 @@ class Args:
     password: str
     file: str
     url: str = dataclasses.field(default="http://localhost:8000")
+    skip_ssl: bool = dataclasses.field(default=False)
 
 
 @dataclasses.dataclass
@@ -27,6 +28,7 @@ class Context:
     name: str
     email: str
     file: str
+    skip_ssl: bool = dataclasses.field(default=False)
 
 
 def setup(context: Context) -> typing.Sequence[LibError]:
@@ -39,7 +41,12 @@ def setup(context: Context) -> typing.Sequence[LibError]:
     ctfd_setup.email = context.email
     ctfd_setup.password = context.password
 
-    return CTFdAPI.setup(context.url, ctfd_setup, root=os.path.dirname(context.file))
+    return CTFdAPI.setup(
+        context.url,
+        ctfd_setup,
+        root=os.path.dirname(context.file),
+        verify_ssl=not context.skip_ssl,
+    )
 
 
 def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
@@ -59,9 +66,19 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         help="Config file path",
         default=os.path.join(root_directory, "ctfd", "setup.json"),
     )
+    parser.add_argument(
+        "-s",
+        "--skip_ssl",
+        action="store_false",
+        help="Skip SSL check",
+        default=False,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
+    if args.skip_ssl:
+        disable_ssl_warnings()
+
     start_time = time.time()
     errors = setup(
         Context(
@@ -70,6 +87,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
             name=args.name,
             email=args.email,
             password=args.password,
+            skip_ssl=args.skip_ssl,
         )
     )
     end_time = time.time()
