@@ -75,7 +75,9 @@ def test_ctfd_deploy() -> None:
         )
 
         # Connect to API
-        api = CTFdAPI.login(TEST_URL, name=TEST_NAME, password=TEST_PASSWORD)
+        api = CTFdAPI.login(
+            TEST_URL, name=TEST_NAME, password=TEST_PASSWORD, verify_ssl=False
+        )
         assert api, "Failed to generate api key"
 
         # Deploy teams

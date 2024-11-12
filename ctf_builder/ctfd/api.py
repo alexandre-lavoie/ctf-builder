@@ -38,12 +38,16 @@ class CTFdAPI:
         return self.__session
 
     @classmethod
-    def login(cls, url: str, name: str, password: str) -> typing.Optional["CTFdAPI"]:
-        access_token = cls.create_access_token_auth(url, name, password)
+    def login(
+        cls, url: str, name: str, password: str, verify_ssl: bool = True
+    ) -> typing.Optional["CTFdAPI"]:
+        access_token = cls.create_access_token_auth(url, name, password, verify_ssl)
         if access_token is None:
             return None
 
-        return CTFdAPI(CTFdSession(url=url, access_token=access_token))
+        return CTFdAPI(
+            CTFdSession(url=url, access_token=access_token, verify_ssl=verify_ssl)
+        )
 
     @classmethod
     def setup(
