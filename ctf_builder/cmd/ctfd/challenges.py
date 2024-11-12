@@ -413,7 +413,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument(
         "-s",
         "--skip_ssl",
-        action="store_false",
+        action="store_true",
         help="Skip SSL check",
         default=False,
     )

@@ -56,6 +56,8 @@ DEV_EMAIL = "admin@ctfd.io"
 
 
 def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
+    skip_ssl = True
+
     container: typing.Optional[docker.models.containers.Container] = None
 
     ctfd_url = f"http://{args.hostname}:{args.port}"
@@ -104,6 +106,7 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
                     email=DEV_EMAIL,
                     password=DEV_PASSWORD,
                     file=setup_path,
+                    skip_ssl=skip_ssl,
                 ),
             )
 
@@ -112,7 +115,9 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
 
         # Generate API
         start_time = time.time()
-        api = CTFdAPI.login(url=ctfd_url, name=DEV_NAME, password=DEV_PASSWORD)
+        api = CTFdAPI.login(
+            url=ctfd_url, name=DEV_NAME, password=DEV_PASSWORD, verify_ssl=not skip_ssl
+        )
         end_time = time.time()
 
         if api is None:
@@ -131,6 +136,7 @@ def dev(args: Args, cli_context: CliContext) -> typing.Sequence[LibError]:
             url=ctfd_url,
             port=args.base_port,
             challenge=args.challenge,
+            skip_ssl=skip_ssl,
         )
 
         challenge_status = challenges_cli(

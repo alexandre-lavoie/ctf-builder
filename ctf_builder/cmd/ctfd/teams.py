@@ -189,7 +189,7 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
     parser.add_argument(
         "-s",
         "--skip_ssl",
-        action="store_false",
+        action="store_true",
         help="Skip SSL check",
         default=False,
     )
@@ -207,7 +207,9 @@ def cli(args: Args, cli_context: CliContext) -> bool:
     context = Context(
         CTFdAPI(
             CTFdSession(
-                url=args.url, access_token=CTFdAccessToken(id=-1, value=args.api_key)
+                url=args.url,
+                access_token=CTFdAccessToken(id=-1, value=args.api_key),
+                verify_ssl=not args.skip_ssl,
             )
         )
     )
