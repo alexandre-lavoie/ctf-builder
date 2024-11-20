@@ -116,6 +116,8 @@ def get_challenges(root_directory: str) -> typing.Optional[typing.Sequence[str]]
 
         break
 
+    challenges = sorted(challenges)
+
     return challenges
 
 
