@@ -87,6 +87,7 @@ FLAG_TYPE - the type of flag to test (static, regex).
 ## 🐋 Docker
 
 ```
+ctf docker list
 ctf docker start
 ctf docker stop
 ctf docker deploy
