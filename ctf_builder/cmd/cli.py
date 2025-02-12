@@ -15,6 +15,8 @@ from .ctfd.teams import cli as ctfd_teams_cli
 from .ctfd.teams import cli_args as ctfd_teams_args
 from .docker.deploy import cli as docker_deploy_cli
 from .docker.deploy import cli_args as docker_deploy_args
+from .docker.list import cli as docker_list_cli
+from .docker.list import cli_args as docker_list_args
 from .docker.start import cli as docker_start_cli
 from .docker.start import cli_args as docker_start_args
 from .docker.stop import cli as docker_stop_cli
@@ -86,6 +88,11 @@ CLI = Menu(
         "docker": Menu(
             help="Docker integration",
             options={
+                "list": Command(
+                    help="List container tags",
+                    args=docker_list_args,
+                    cli=docker_list_cli,
+                ),
                 "start": Command(
                     help="Start challenges",
                     args=docker_start_args,
