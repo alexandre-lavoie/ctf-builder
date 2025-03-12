@@ -27,6 +27,7 @@ class DockerDeployContext:
     port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )
+    repository: typing.Optional[str] = dataclasses.field(default=None)
     tag: bool = dataclasses.field(default=True)
 
 
@@ -35,6 +36,7 @@ class K8sDeployContext:
     name: str
     root: str
     track: str
+    repository: typing.Optional[str] = dataclasses.field(default=None)
     port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )

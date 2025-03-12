@@ -29,7 +29,7 @@ def test_deploy() -> None:
         console=rich.console.Console(quiet=True),
     )
 
-    assert deploy_cli(cli_context=context, args=DeployArgs(challenge=TEST_CHALLENGES))
+    assert deploy_cli(cli_context=context, args=DeployArgs(challenge=TEST_CHALLENGES, repository="repo"))
 
 
 def test_start_stop() -> None:
