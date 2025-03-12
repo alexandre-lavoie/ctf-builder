@@ -64,6 +64,11 @@ class DeployDocker(BaseDeploy):
     ) -> str:
         return to_docker_tag(context.name)
 
+    def get_full_tag_name(
+        self, context: typing.Union[DockerDeployContext, K8sDeployContext]
+    ) -> str:
+        return to_docker_tag(context.name, context.repository)
+
     def get_container_name(
         self, context: typing.Union[DockerDeployContext, K8sDeployContext]
     ) -> str:
@@ -137,7 +142,7 @@ class DeployDocker(BaseDeploy):
 
         try:
             image, _ = context.docker_client.images.build(
-                tag=self.get_tag_name(context) if tag else None,
+                tag=self.get_full_tag_name(context) if tag else None,
                 path=os.path.dirname(dockerfile),
                 dockerfile=dockerfile,
                 buildargs=build_args,
@@ -307,7 +312,7 @@ class DeployDocker(BaseDeploy):
 
         container = K8sContainer(
             name=self.get_tag_name(context),
-            image=self.get_tag_name(context),
+            image=self.get_full_tag_name(context),
             ports=[
                 K8sContainerPort(
                     name=(

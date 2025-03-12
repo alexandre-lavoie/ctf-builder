@@ -27,6 +27,7 @@ TEST_NAME = "test"
 TEST_PASSWORD = "test"
 TEST_EMAIL = "test@ctf.com"
 TEST_HOST = CHALLENGE_HOST
+TEST_CHALLENGE_HOST = "challenges"
 TEST_PORT = 9876
 TEST_URL = f"http://{TEST_HOST}:{TEST_PORT}/"
 TEST_CHALLENGES: typing.List[str] = []
@@ -118,6 +119,7 @@ def test_ctfd_deploy() -> None:
         challenge_args = ChallengesArgs(
             api_key=api.session.access_token.value or "",
             url=TEST_URL,
+            host=TEST_CHALLENGE_HOST,
             port=CHALLENGE_BASE_PORT,
             challenge=TEST_CHALLENGES,
             skip_ssl=True,

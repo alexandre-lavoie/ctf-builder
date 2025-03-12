@@ -21,4 +21,6 @@ def test_k8s_build() -> None:
     )
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        assert build_cli(cli_context=context, args=BuildArgs(output=temp_dir))
+        assert build_cli(
+            cli_context=context, args=BuildArgs(repository="repo", output=temp_dir)
+        )

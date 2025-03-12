@@ -50,6 +50,7 @@ from ..common import (
 class Args:
     output: str
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    repository: typing.Optional[str] = dataclasses.field(default=None)
     port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
 
 
@@ -66,6 +67,7 @@ class Context(WrapContext):
     output: str
     port: int
     public_ports: typing.List[PublicPort]
+    repository: typing.Optional[str] = dataclasses.field(default=None)
 
 
 def cleanup(data: typing.Any) -> typing.Any:
@@ -109,6 +111,7 @@ def build(track: Track, context: Context) -> typing.Sequence[LibError]:
                 track=f"{track.tag or track.name}",
                 root=context.challenge_path,
                 port_generator=next_port,
+                repository=context.repository,
             ),
         )
         if k8s_obj is None:
@@ -319,6 +322,12 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         default=[],
     )
     parser.add_argument(
+        "-r",
+        "--repository",
+        help="Container repository path for challenges",
+        default=None,
+    )
+    parser.add_argument(
         "-p",
         "--port",
         type=int,
@@ -341,6 +350,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         output=args.output,
         port=args.port,
         public_ports=[],
+        repository=args.repository,
     )
 
     if not cli_challenge_wrapper(

@@ -14,6 +14,7 @@ from ..common import CliContext, WrapContext, cli_challenge_wrapper, get_challen
 @dataclasses.dataclass(frozen=True)
 class Args:
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
+    repository: typing.Optional[str] = dataclasses.field(default=None)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -21,6 +22,7 @@ class Context(WrapContext):
     docker_client: typing.Optional[docker.DockerClient] = dataclasses.field(
         default=None
     )
+    repository: typing.Optional[str] = dataclasses.field(default=None)
 
 
 def deploy(track: Track, context: Context) -> typing.Sequence[LibError]:
@@ -35,6 +37,7 @@ def deploy(track: Track, context: Context) -> typing.Sequence[LibError]:
                 root=context.challenge_path,
                 docker_client=context.docker_client,
                 network=None,
+                repository=context.repository,
             ),
         )
 
@@ -50,6 +53,12 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         help="Name of challenges",
         default=[],
     )
+    parser.add_argument(
+        "-r",
+        "--repository",
+        help="Container repository path for challenges",
+        default=None,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
@@ -58,6 +67,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         error_prefix=[],
         skip_inactive=False,
         docker_client=cli_context.docker_client,
+        repository=args.repository,
     )
 
     return cli_challenge_wrapper(
