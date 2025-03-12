@@ -35,6 +35,7 @@ from ..common import (
 class Args:
     api_key: str
     url: str = dataclasses.field(default="http://localhost:8000")
+    host: typing.Optional[str] = dataclasses.field(default=None)
     port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
     skip_ssl: bool = dataclasses.field(default=False)
@@ -44,6 +45,7 @@ class Args:
 class Context(WrapContext):
     api: CTFdAPI
     port: int
+    host: typing.Optional[str] = dataclasses.field(default=None)
 
 
 def build_challenges(
@@ -106,7 +108,7 @@ def build_challenges(
             port, port_value = deploy_ports[0]
             connection_info = port.connection_string(
                 ConnectionContext(
-                    host=context.api.session.hostname(),
+                    host=context.host or context.api.session.hostname(),
                     port=port_value,
                     path=challenge.host.path,
                 )
@@ -396,6 +398,12 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         "-u", "--url", help="URL for CTFd", default="http://localhost:8000"
     )
     parser.add_argument(
+        "-t",
+        "--host",
+        help="IP or domain for challenges (defaults to CTFd domain if not specified)",
+        default=None,
+    )
+    parser.add_argument(
         "-c",
         "--challenge",
         action="append",
@@ -434,6 +442,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
                 verify_ssl=not args.skip_ssl,
             )
         ),
+        host=args.host,
         port=args.port,
     )
 

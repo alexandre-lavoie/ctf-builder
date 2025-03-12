@@ -322,7 +322,10 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         default=[],
     )
     parser.add_argument(
-        "-r", "--repository", help="Container repository path for challenges", default=None
+        "-r",
+        "--repository",
+        help="Container repository path for challenges",
+        default=None,
     )
     parser.add_argument(
         "-p",
