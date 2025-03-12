@@ -16,6 +16,7 @@ from ...k8s.models import (
     K8sContainerPort,
     K8sDeployment,
     K8sDeploymentSpec,
+    K8sKind,
     K8sList,
     K8sMatchSelector,
     K8sMetadata,
@@ -343,6 +344,8 @@ class DeployDocker(BaseDeploy):
             ),
         )
 
+        items: typing.List[K8sKind] = []
+
         deployment = K8sDeployment(
             apiVersion="apps/v1",
             kind="Deployment",
@@ -360,31 +363,34 @@ class DeployDocker(BaseDeploy):
                 ),
             ),
         )
+        items.append(deployment)
 
-        service = K8sService(
-            apiVersion="v1",
-            kind="Service",
-            metadata=K8sMetadata(name=self.get_tag_name(context), labels=labels),
-            spec=K8sServiceSpec(
-                type=K8sServiceType.ClusterIP,
-                selector={"challenge": self.get_tag_name(context)},
-                ports=[
-                    K8sServicePort(
-                        name=f"p-{port.value}",
-                        protocol=port.k8s_port_protocol(),
-                        port=port.value,
-                        targetPort=port.value,
-                    )
-                    for port in self.ports
-                ],
-            ),
-        )
+        if self.ports:
+            service = K8sService(
+                apiVersion="v1",
+                kind="Service",
+                metadata=K8sMetadata(name=self.get_tag_name(context), labels=labels),
+                spec=K8sServiceSpec(
+                    type=K8sServiceType.ClusterIP,
+                    selector={"challenge": self.get_tag_name(context)},
+                    ports=[
+                        K8sServicePort(
+                            name=f"p-{port.value}",
+                            protocol=port.k8s_port_protocol(),
+                            port=port.value,
+                            targetPort=port.value,
+                        )
+                        for port in self.ports
+                    ],
+                ),
+            )
+            items.append(service)
 
         out = K8sList(
             apiVersion="v1",
             kind="List",
             metadata=K8sMetadata(),
-            items=[deployment, service],
+            items=items,
         )
 
         return out, []
