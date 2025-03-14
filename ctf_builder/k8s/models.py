@@ -12,7 +12,7 @@ class K8sMetadata(pydantic.BaseModel):
 
 class K8sImagePullPolicy(enum.Enum):
     IfNotPresent = "IfNotPresent"
-    Awalys = "Always"
+    Always = "Always"
     Never = "Never"
 
 
@@ -105,7 +105,7 @@ class K8sContainer(pydantic.BaseModel):
     name: str
     image: str
     imagePullPolicy: K8sImagePullPolicy = pydantic.Field(
-        default=K8sImagePullPolicy.IfNotPresent
+        default=K8sImagePullPolicy.Always
     )
     ports: typing.List[K8sContainerPort] = pydantic.Field(default_factory=list)
     resources: typing.Optional[K8sContainerResources] = pydantic.Field(default=None)
