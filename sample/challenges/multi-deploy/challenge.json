@@ -82,6 +82,9 @@
         "retries": 3,
         "interval": 0.5,
         "timeout": 1.5
+      },
+      "cpu": {
+        "max": "1.0"
       }
     },
     {
@@ -100,6 +103,9 @@
         "retries": 3,
         "interval": 0.5,
         "timeout": 1.5
+      },
+      "memory": {
+        "max": "1G"
       }
     }
   ],

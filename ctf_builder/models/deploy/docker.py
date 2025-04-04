@@ -14,6 +14,9 @@ from ...k8s.models import (
     K8sContainerLivenessProbe,
     K8sContainerLivenessProbeExec,
     K8sContainerPort,
+    K8sContainerResourceLimits,
+    K8sContainerResourceRequests,
+    K8sContainerResources,
     K8sDeployment,
     K8sDeploymentSpec,
     K8sKind,
@@ -32,6 +35,8 @@ from ..healthcheck import Healthcheck
 from ..path import FilePath, PathContext
 from ..port import Port
 from .base import BaseDeploy, DockerDeployContext, K8sDeployContext
+from .cpu import CPU
+from .memory import Memory
 
 
 class DeployDocker(BaseDeploy):
@@ -57,7 +62,13 @@ class DeployDocker(BaseDeploy):
         default_factory=list, description="Ports for deployment", discriminator="type"
     )
     healthcheck: typing.Optional[Healthcheck] = pydantic.Field(
-        default=None, description=("Healtcheck for Dockerfile")
+        default=None, description="Healtcheck for Dockerfile"
+    )
+    cpu: typing.Optional[CPU] = pydantic.Field(
+        default=None, description="CPU configuration for container"
+    )
+    memory: typing.Optional[Memory] = pydantic.Field(
+        default=None, description="Memory configuration for container"
     )
 
     def get_tag_name(
@@ -201,6 +212,35 @@ class DeployDocker(BaseDeploy):
         if container_name != dns_name:
             aliases.append(container_name)
 
+        cpu_min: typing.Optional[int] = None
+        cpu_max: typing.Optional[int] = None
+        if self.cpu:
+            if self.cpu.min:
+                t_min = 0.0
+
+                if self.cpu.min.endswith("m"):
+                    t_min = float(self.cpu.min[:-1]) / 1_000
+                else:
+                    t_min = float(self.cpu.min)
+
+                cpu_min = int(t_min * 1024)
+
+            if self.cpu.max:
+                t_max: float = 0.0
+
+                if self.cpu.max.endswith("m"):
+                    t_max = float(self.cpu.max[:-1]) / 1_000
+                else:
+                    t_max = float(self.cpu.max)
+
+                cpu_max = int(t_max * 1e9)
+
+        mem_min: typing.Optional[str] = None
+        mem_max: typing.Optional[str] = None
+        if self.memory:
+            mem_min = (self.memory.min or "").lower()
+            mem_max = (self.memory.max or "").lower()
+
         try:
             context.docker_client.containers.run(
                 image=image,
@@ -227,6 +267,10 @@ class DeployDocker(BaseDeploy):
                     if self.healthcheck
                     else None
                 ),
+                cpu_shares=cpu_min,
+                nano_cpus=cpu_max,
+                mem_reservation=mem_min,
+                mem_limit=mem_max,
             )
 
             return []
@@ -314,6 +358,7 @@ class DeployDocker(BaseDeploy):
         container = K8sContainer(
             name=self.get_tag_name(context),
             image=self.get_full_tag_name(context),
+            imagePullPolicy=context.image_pull_policy,
             ports=[
                 K8sContainerPort(
                     name=(
@@ -340,6 +385,30 @@ class DeployDocker(BaseDeploy):
                     failureThreshold=self.healthcheck.retries,
                 )
                 if self.healthcheck
+                else None
+            ),
+            resources=(
+                K8sContainerResources(
+                    requests=(
+                        K8sContainerResourceRequests(
+                            cpu=self.cpu.min if self.cpu else None,
+                            memory=self.memory.min if self.memory else None,
+                        )
+                        if (self.cpu and self.cpu.min)
+                        or (self.memory and self.memory.min)
+                        else None
+                    ),
+                    limits=(
+                        K8sContainerResourceLimits(
+                            cpu=self.cpu.max if self.cpu else None,
+                            memory=self.memory.max if self.memory else None,
+                        )
+                        if (self.cpu and self.cpu.max)
+                        or (self.memory and self.memory.max)
+                        else None
+                    ),
+                )
+                if self.cpu or self.memory
                 else None
             ),
         )
