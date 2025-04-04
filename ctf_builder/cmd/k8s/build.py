@@ -14,6 +14,7 @@ from ...k8s.models import (
     K8sContainerPort,
     K8sDeployment,
     K8sDeploymentSpec,
+    K8sImagePullPolicy,
     K8sKeyPath,
     K8sList,
     K8sMatchSelector,
@@ -49,6 +50,7 @@ from ..common import (
 @dataclasses.dataclass(frozen=True)
 class Args:
     output: str
+    pull: str = dataclasses.field(default="Always")
     challenge: typing.Sequence[str] = dataclasses.field(default_factory=list)
     repository: typing.Optional[str] = dataclasses.field(default=None)
     port: int = dataclasses.field(default=CHALLENGE_BASE_PORT)
@@ -68,6 +70,9 @@ class Context(WrapContext):
     port: int
     public_ports: typing.List[PublicPort]
     repository: typing.Optional[str] = dataclasses.field(default=None)
+    image_pull_policy: K8sImagePullPolicy = dataclasses.field(
+        default=K8sImagePullPolicy.Always
+    )
 
 
 def cleanup(data: typing.Any) -> typing.Any:
@@ -112,6 +117,7 @@ def build(track: Track, context: Context) -> typing.Sequence[LibError]:
                 root=context.challenge_path,
                 port_generator=next_port,
                 repository=context.repository,
+                image_pull_policy=context.image_pull_policy,
             ),
         )
         if k8s_obj is None:
@@ -340,6 +346,13 @@ def cli_args(parser: argparse.ArgumentParser, root_directory: str) -> None:
         help="Output directory for files",
         default=os.path.join(root_directory, "k8s"),
     )
+    parser.add_argument(
+        "-u",
+        "--pull",
+        help="Image pull policy",
+        choices=([e.value for e in K8sImagePullPolicy]),
+        default=K8sImagePullPolicy.Always.value,
+    )
 
 
 def cli(args: Args, cli_context: CliContext) -> bool:
@@ -351,6 +364,7 @@ def cli(args: Args, cli_context: CliContext) -> bool:
         port=args.port,
         public_ports=[],
         repository=args.repository,
+        image_pull_policy=K8sImagePullPolicy(args.pull),
     )
 
     if not cli_challenge_wrapper(

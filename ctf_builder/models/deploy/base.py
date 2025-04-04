@@ -6,7 +6,7 @@ import docker
 import pydantic
 
 from ...error import LibError
-from ...k8s.models import K8sKind
+from ...k8s.models import K8sImagePullPolicy, K8sKind
 from ..port import Port
 
 
@@ -40,6 +40,7 @@ class K8sDeployContext:
     port_generator: typing.Generator[typing.Optional[int], None, None] = (
         dataclasses.field(default_factory=lambda: default_port_generator())
     )
+    image_pull_policy: K8sImagePullPolicy = K8sImagePullPolicy.Always
 
 
 class BaseDeploy(abc.ABC, pydantic.BaseModel):
